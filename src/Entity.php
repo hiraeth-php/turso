@@ -32,7 +32,7 @@ class Entity
 	 * Create a new instance of the entity and populate it with its values
 	 * @param array<string, array{'type': string, 'value': mixed}> $values
 	 */
-	final static public function _create(Database $database, array $values): self
+	final static public function _create(Database $database, array $values): static
 	{
 		$entity            = new static();
 		$entity->_database = $database;
@@ -88,7 +88,7 @@ class Entity
 		$values = array();
 
 		foreach ($entity::_inspect() as $field) {
-			if ($entity->$field != $entity->_values[$field]) {
+			if (!isset($entity->_values[$field]) || $entity->$field != $entity->_values[$field]) {
 				$values[$field] = $entity->$field;
 
 				if ($reset) {

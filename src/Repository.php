@@ -75,7 +75,9 @@ abstract class Repository
 			));
 		}
 
-		$result = $this->database->execute("SELECT * FROM @table LIMIT 1", [], [ 'table' => static::$table ]);
+		$result = $this->database
+			->execute("SELECT * FROM @table LIMIT 1", [], [ 'table' => static::$table ])
+		;
 
 		if ($result->isError()) {
 			throw new RuntimeException(sprintf(
@@ -122,6 +124,35 @@ abstract class Repository
 	/**
 	 *
 	 */
+	public function create(array $values = array())
+	{
+		$entity  = new static::$entity();
+		$fields  = $entity::_inspect();
+		$invalid = array_diff(array_keys($values), $fields);
+
+		if ($invalid) {
+			throw new InvalidArgumentException(sprintf(
+				'Unsupported fields %s when creating entity of type "%s"',
+				implode(', ', $invalid),
+				static::$entity
+			));
+		}
+
+		foreach ($fields as $field) {
+			if (!isset($values[$field])) {
+				continue;
+			}
+
+			$entity->$field = $values[$field];
+		}
+
+		return $entity;
+	}
+
+
+	/**
+	 *
+	 */
 	public function delete(Entity $entity): Result
 	{
 		$query = new DeleteQuery(static::$table);
@@ -129,12 +160,14 @@ abstract class Repository
 
 		foreach (static::$identity as $field) {
 			$column  = $this->mapping[$field];
-			$ident[] = $query->eq($column, $entity->$field);
+			$ident[] = $query->expr()->eq($column, $entity->$field);
 		}
 
 		$result = $this->database->execute($query->where(...$ident));
 
-		return $this->database->dieOnError($result, 'Failed removing record');
+		return $this->database
+			->dieOnError($result, 'Failed removing record')
+		;
 	}
 
 
@@ -179,7 +212,7 @@ abstract class Repository
 
 
 	/**
-	 * Find entities based on a set of simple field = value critier, with optional ordering, limit, and page
+	 * Find entities based on simple field = value criteria + optional ordering, limit, and page
 	 * @param array<string, mixed> $criteria
 	 * @param array<string, string> $order
 	 */
@@ -194,7 +227,7 @@ abstract class Repository
 		}
 
 		foreach ($criteria as $field => $value) {
-			$conditions[] = $query->eq($field, $value);
+			$conditions[] = $query->expr()->eq($field, $value);
 		}
 
 		foreach ($order as $field => $value) {
@@ -212,6 +245,33 @@ abstract class Repository
 				;
 			}
 		);
+	}
+
+
+	/**
+	 *
+	 */
+	public function insert(Entity $entity): Result
+	{
+		$query  = new InsertQuery(static::$table);
+		$values = array();
+
+		foreach ($entity::_diff($entity, TRUE) as $field => $value) {
+			$values[$this->mapping[$field]] = $value;
+		}
+
+		$result = $this->database->execute($query->values($values));
+
+		if (count(static::$identity) == 1 && empty($values[static::$identity[0]])) {
+			$field          = static::$identity[0];
+			$entity->$field = $result->getInsertId();
+
+			$entity::_diff($entity, TRUE);
+		}
+
+		return $this->database
+			->dieOnError($result, 'Failed inserting record')
+		;
 	}
 
 
@@ -249,17 +309,19 @@ abstract class Repository
 
 		foreach (static::$identity as $field) {
 			$column  = $this->mapping[$field];
-			$ident[] = $query->eq($column, $entity->$field);
+			$ident[] = $query->expr()->eq($column, $entity->$field);
 		}
 
 		foreach ($values as $field => $value) {
 			$column = $this->mapping[$field];
-			$sets[] = $query->eq($column, $value);
+			$sets[] = $query->expr()->eq($column, $value);
 		}
 
 		$result = $this->database->execute($query->set(...$sets)->where(...$ident));
 
-		return $this->database->dieOnError($result, 'Failed updating record');
+		return $this->database
+			->dieOnError($result, 'Failed updating record')
+		;
 	}
 }
 

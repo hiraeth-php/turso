@@ -124,41 +124,14 @@ class Query
 
 
 	/**
-	 * Create a new unwrapped query containing only a set of conditions bound by ' AND '
-	 */
-	public function all(Query ...$conditions): self
-	{
-		return $this('@conditions')->bind(' AND ')->raw('conditions', $conditions);
-	}
-
-
-	/**
-	 * Create a new unwrapped query containing only a set of conditions bound by ' OR '
-	 */
-	public function any(Query ...$conditions): self
-	{
-		return $this('@conditions')->bind(' OR ')->raw('conditions', $conditions);
-	}
-
-
-	/**
 	 * Bind the query and set wrapping
 	 */
-	public function bind(string $separator, bool $wrap = TRUE): self
+	public function bind(string $separator, bool $wrap = TRUE): static
 	{
 		$this->bind = $separator;
 		$this->wrap = $wrap;
 
 		return $this;
-	}
-
-
-	/**
-	 * Create a new query in the style: @name = {value}
-	 */
-	public function eq(string $name, mixed $value): self
-	{
-		return $this('@name = {value}')->raw('name', $name)->var('value', $value);
 	}
 
 
@@ -195,53 +168,13 @@ class Query
 		}
 	}
 
-	/**
-	 * Create a new query in the style: LIMIT {amount}
-	 * If the amount is falsey the query will be an empty string (no LIMIT keyword)
-	 */
-	public function limit(?int $amount): self
-	{
-		if (!$amount) {
-			return $this('');
-		}
-		return $this('LIMIT {amount}')->var('amount', $amount);
-	}
-
-
-	/**
-	 * Create a new query in the style: OFFSET {position}
-	 * If the position is falsey the query will be an empty string (no OFFSET keyword)
-	 */
-	public function offset(?int $position): self
-	{
-		if (!$position || $position < 0) {
-			return $this('');
-		}
-
-		return $this('OFFSET {position}')->var('position', $position);
-	}
-
-
-	/**
-	 * Create a new query in the style: ORDER BY ...@sorts
-	 * If the sorts is empty the query will be an empty string (no ORDER BY keyword)
-	 */
-	public function order(Query ...$sorts): self
-	{
-		if (empty($sorts)) {
-			return $this('');
-		}
-
-		return $this('ORDER BY @sorts')->bind(', ', FALSE)->raw('sorts', $sorts);
-	}
-
 
 	/**
 	 * Add a raw value to the query
 	 * If the value is an array they will be bound/wrapped by default
 	 * @param string|array<string> $value
 	 */
-	public function raw(string $name, string|array $value): self
+	public function raw(string $name, string|array $value): static
 	{
 		$this->raws[$name] = $value;
 
@@ -250,45 +183,12 @@ class Query
 
 
 	/**
-	 * Create a new query in the style: @field @direction
-	 * Direction must be variation of 'asc' or 'desc' or an exception will be thrown
-	 */
-	public function sort(string $field, string $direction = 'ASC'): self
-	{
-		$direction = strtoupper($direction);
-
-		if (!in_array($direction, ['ASC', 'DESC'])) {
-			throw new InvalidArgumentException(sprintf(
-				'Cannot construct sort query with invalid direction "%s", must be ASC or DESC',
-				$direction
-			));
-		}
-
-		return $this('@field @direction')->raw('field', $field)->raw('direction', $direction);
-	}
-
-
-	/**
 	 * Add an escapable variable to the query
 	 */
-	public function var(string $name, mixed $value): self
+	public function var(string $name, mixed $value): static
 	{
 		$this->vars[$name] = $value;
 
 		return $this;
-	}
-
-
-	/**
-	 * Create a new query in the style: WHERE @conditions
-	 * If the conditions is empty the query will be an empty string (no WHERE keyword)
-	 */
-	public function where(Query ...$conditions): self
-	{
-		if (empty($conditions)) {
-			return $this('');
-		}
-
-		return $this('WHERE @conditions')->bind(' AND ', FALSE)->raw('conditions', $conditions);
 	}
 }

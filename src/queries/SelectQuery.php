@@ -2,7 +2,9 @@
 
 namespace Hiraeth\Turso;
 
-class SelectQuery extends Query
+use InvalidArgumentException;
+
+class SelectQuery extends WhereQuery
 {
 	/**
 	 *
@@ -18,7 +20,7 @@ class SelectQuery extends Query
 	/**
 	 *
 	 */
-	public function cols(string ...$names): self
+	public function cols(string ...$names): static
 	{
 		$this->raw('cols', $this('@names')->bind(', ', FALSE)->raw('names', $names));
 
@@ -27,45 +29,71 @@ class SelectQuery extends Query
 
 
 	/**
-	 *
+	 * Set the "LIMIT" portion of the statement
 	 */
-	public function limit(?int $limit): self
+	public function limit(?int $amount): static
 	{
-		$this->raw('limit', parent::limit($limit));
+		if (!$amount) {
+			$clause = $this('');
+		} else {
+			$clause = $this('LIMIT {amount}')->var('amount', $amount);
+		}
+
+		$this->raw('limit', $clause);
 
 		return $this;
 	}
 
 
 	/**
-	 *
+	 * Set the "OFFSET" portion of the statement
 	 */
-	public function offset(?int $offset): self
+	public function offset(?int $position): static
 	{
-		$this->raw('offset', parent::offset($offset));
+		if (!$position || $position < 0) {
+			$clause = $this('');
+		} else {
+			$clause = $this('OFFSET {position}')->var('position', $position);
+		}
+
+		$this->raw('offset', $clause);
 
 		return $this;
 	}
 
 
 	/**
-	 *
+	 * Set the "ORDER BY" portion of the statement
 	 */
-	public function order(Query ...$sorts): self
+	public function order(Query ...$sorts): static
 	{
-		$this->raw('order', parent::order(...$sorts));
+		if (empty($sorts)) {
+			$clause = $this('');
+		} else {
+			$clause = $this('ORDER BY @sorts')->bind(', ', FALSE)->raw('sorts', $sorts);
+		}
+
+		$this->raw('order', $clause);
 
 		return $this;
 	}
 
 
 	/**
-	 *
+	 * Create a new query fragment in the style: @field @direction
+	 * Direction must be variation of 'asc' or 'desc' or an exception will be thrown
 	 */
-	public function where(Query ...$conditions): self
+	public function sort(string $field, string $direction = 'ASC'): Query
 	{
-		$this->raw('where', parent::where(...$conditions));
+		$direction = strtoupper($direction);
 
-		return $this;
+		if (!in_array($direction, ['ASC', 'DESC'])) {
+			throw new InvalidArgumentException(sprintf(
+				'Cannot construct sort query with invalid direction "%s", must be ASC or DESC',
+				$direction
+			));
+		}
+
+		return $this('@field @direction')->raw('field', $field)->raw('direction', $direction);
 	}
 }
