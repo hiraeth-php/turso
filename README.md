@@ -58,7 +58,7 @@ echo sprintf('There were %d results from the query', count($result));
 Iterate over results:
 
 ```php
-foreach ($result() as $user) {
+foreach ($result as $user) {
     echo $user->first_name . PHP_EOL;
 }
 ```
@@ -66,7 +66,7 @@ foreach ($result() as $user) {
 Mapping results to a typed DTO allows you to turn columns into nice properties:
 
 ```php
-foreach ($result(User::class) as $user) {
+foreach ($result->of(User::class) as $user) {
     echo $user->firstName . PHP_EOL;
 }
 ```
@@ -96,10 +96,8 @@ $record = $result->getRecord(0);
 And similar to using the iteration model, you can pass a DTO to map to:
 
 ```php
-$record = $result->getRecord(0, User::class);
+$record = $result->of(User::class)->getRecord(0);
 ```
-
-> NOTE: You SHOULD NOT use `count()` and `getRecord()` to loop over results as this has lower performance than using the `$result()` callable iteration style.
 
 You can get all the records as an array so that you can use `array_map` or `array_filter` using the following:
 
@@ -110,17 +108,19 @@ $records = $result->getRecords();
 And you can map them to a typed DTO by passing the class there too:
 
 ```php
-$records = $result->getRecords(User::class);
+$records = $result->of(User::class)->getRecords();
 ```
 
 ## Query Parameters
 
-When executing queries you can pass parameters by setting placeholders:
+When executing queries you can pass variables by setting placeholders:
 
 ```php
 $result = $database->execute(
 	"SELECT * FROM users WHERE email = {email}",
-	[ 'email' => 'info@hiraeth.dev' ]
+	[
+        'email' => 'info@hiraeth.dev'
+    ]
 );
 ```
 
@@ -129,17 +129,24 @@ You can do this with lists too:
 ```php
 $result = $database->execute(
 	"INSERT INTO users (first_name, last_name, email) VALUES {values}",
-    [ 'values' => ['Matthew', 'Sahagian', 'msahagian@hiraeth.dev'] ]
+    [
+        'values' => ['Matthew', 'Sahagian', 'msahagian@hiraeth.dev']
+    ]
 );
 ```
 
-If you need to pass in raw parameters, use this style:
+If you need to pass in raw values, use the `@` symbol in place of brackets in the SQL template, and pass them in the third argument:
 
 ```php
 $result = $database->execute(
 	"SELECT * FROM @table WHERE @column = 1",
-    [],
-    [ 'table' => 'users', 'column' => 'id' ]
+    [
+        // variables go here, but there are none
+    ],
+    [
+    	'table' => 'users',
+        'column' => 'id'
+    ]
 );
 ```
 
@@ -154,7 +161,12 @@ class User extends Hiraeth\Turso\Entity
 
     public function occupation()
     {
-        return $this('occupations')->hasOne(['occupation' => 'id'], Occupation::class);
+        return $this('occupations')->hasOne(
+            [
+                'occupation' => 'id'
+            ],
+            Occupation::class
+        );
     }
 }
 ```
@@ -170,7 +182,12 @@ class Occupation extends Hiraeth\Turso\Entity
 
 	public function workers()
 	{
-		return $this('users')->hasMany(['id' => 'occupation'], User::class);
+		return $this('users')->hasMany(
+            [
+                'id' => 'occupation'
+            ],
+            User::class
+        );
 	}
 }
 ```
@@ -181,7 +198,10 @@ For a many-to-many, you need to go through another table:
 public function relatedOccupations()
 {
     return $this('occupations', 'related_occupations')->hasMany(
-    	['id' => 'occupation', 'related_occupation' => 'id'],
+    	[
+            'id' => 'occupation',
+            'related_occupation' => 'id'
+        ],
      	Occupation::class
     );
 }
@@ -227,7 +247,9 @@ $user = $users->find(1);
 If your `$identity` is compound, or if you want to search by other unique columns or a combination of columns that produces a unique result you can pass an array:
 
 ```php
-$user = $users->find(['email' => 'info@hiraeth.dev']);
+$user = $users->find([
+    'email' => 'info@hiraeth.dev'
+]);
 ```
 
 > NOTE: The `find()` method will return directly the custom DTO or `NULL` if it cannot be found.  It will also throw exceptions if the constraints you pass as the first parameter don't yield a single record.  So you should only use it on unique columns and/or multi-columns with actual unique constraints.
@@ -241,13 +263,21 @@ $all_users = $users->findAll();
 You can also perform a `findBy()` with optional order, limits, and page:
 
 ```php
-$some_users = $users->findBy(['occupation' => $occupation->id], [], 15, $page);
+$some_users = $users->findBy(
+    [
+        'occupation' => $occupation->id
+    ],
+    [], 15, $page
+);
 ```
 
 The second parameter above is an ordering set.  You can specify the default order on the Repository like so:
 
 ```php
-static protected $order = ['lastName' => 'asc', 'firstName' => 'asc'];
+static protected $order = [
+    'lastName'  => 'asc',
+    'firstName' => 'asc'
+];
 ```
 
 If you pass the order, to `findBy()` it will overload it... the default order also applies to `findAll()`.
@@ -256,29 +286,14 @@ If you pass the order, to `findBy()` it will overload it... the default order al
 
 ### Queries
 
-Queries are highly experimental even though they do power the basic function.  So consider this documentation not ready for use (some of the features described here may not even be implemented yet).
+Queries are highly experimental even though they do power the basic find functions.  So consider this documentation not ready for use (some of the features described here may not even be implemented yet).  If you're interested in understanding that a bit more, look at the `Query.php` file in the `src` directory source.
 
-The basic idea, however, is that they use the basic templating language for `execute()` along with the ability for raw values to be, themselves, queries or arrays of queries.  If you're interested in understanding that a bit more, look at the `Query.php` file in the `src` directory source.  Here's what the `findBy()` query looks like:
-
-```php
-$result = $this->database->execute(
-    $query("SELECT * FROM @table @where ORDER BY @order @limit @start")
-        ->raw('table', static::$table)
-        ->raw('where', $query->where(...$conditions))
-        ->raw('order', $query->order(...$order_bys))
-        ->raw('limit', $query->limit($limit))
-        ->raw('start', $query->offset(($page - 1) * $limit))
-);
-```
-
-This is not really a "builder" per say (like Doctrine's query builder), it's more like a template expander.  Since the queries ultimately just resolve to strings, you can pass these to `Databse::execute()`.
-
-However, similar to Hiraeth's Doctrine Repositories, we do intend to implement a similar `query()` method, with a shorter syntax:
+This is not really a builder (like Doctrine's query builder), per se, it's more like a template expander with sub-templates.  Since the queries ultimately just resolve to strings, you can pass these to `Databse::execute()` as a single first parameter, however, similar to Hiraeth's Doctrine Repositories, we do intend to implement a similar `query()` method for repositories, with a shorter syntax:
 
 ```php
-$users->query(function(Query $query) {
+$users->query(function(SelectQuery $query) {
    return $query
-       ->setWhere(
+       ->where(
            $query->like('email', '%@hiraeth.dev'),
            $query->gte('codingAge', 28),
            $query->any(
@@ -286,12 +301,12 @@ $users->query(function(Query $query) {
                $query->eq('primaryLanguage', 'pascal')
            )
    	   )
-       ->setOrderBy(
+       ->order(
            $query->sort('lastName', 'asc'),
            $query->sort('firstName', 'asc')
    	   )
-       ->setLimit($limit)
-       ->setOffset($offset)
+       ->limit($limit)
+       ->offset($offset)
    ;+
 });
 ```

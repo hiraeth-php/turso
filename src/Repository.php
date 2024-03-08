@@ -5,25 +5,50 @@ namespace Hiraeth\Turso;
 use InvalidArgumentException;
 use RuntimeException;
 
+/**
+ * Repositories are responsible for easily interfacing with common SQL operations using entities
+ */
 abstract class Repository
 {
-	static protected $entity = NULL;
+	/**
+	 * The entity class for which this repository operates
+	 * @var class-string
+	 */
+	static protected $entity;
 
+	/**
+	 * An array containing the entity's fields which constitute its identity/primary key
+	 * @var array<string>
+	 */
 	static protected $identity = array();
 
-	static protected $table = NULL;
-
+	/**
+	 * An array containing entity field => direction ('asc' or 'desc'), for default ordering
+	 * @var array<string, string>
+	 */
 	static protected $order = array();
 
 	/**
+	 * The name of the SQL table to which this repository maps
+	 * @var string
+	 */
+	static protected $table;
+
+	/**
+	 * The database on which this repository operates
 	 * @var Database
 	 */
 	protected $database;
 
-	protected $map = array();
+	/**
+	 * A cached map (when repository is constructed) of entity fields to column names
+	 * @var array<string, string>
+	 */
+	protected $mapping = array();
+
 
 	/**
-	 *
+	 * Create a new repository instance
 	 */
 	final public function __construct(Database $database)
 	{
@@ -60,6 +85,7 @@ abstract class Repository
 			));
 		}
 
+
 		$fields  = static::$entity::_inspect();
 		$columns = array_map(
 			fn($column) => $column['name'],
@@ -72,12 +98,12 @@ abstract class Repository
 				$column = preg_replace('/[^a-z0-9]/', '', strtolower($column));
 
 				if ($field == $column) {
-					$this->map[$fields[$i]] = $columns[$j];
+					$this->mapping[$fields[$i]] = $columns[$j];
 				}
 			}
 		}
 
-		if ($missing = array_diff(static::$identity, array_keys($this->map))) {
+		if ($missing = array_diff(static::$identity, array_keys($this->mapping))) {
 			throw new RuntimeException(sprintf(
 				'Cannot initialize repository "%s", no columns could match identify fields: %s',
 				static::class,
@@ -95,9 +121,10 @@ abstract class Repository
 
 
 	/**
-     *
+	 * Find a single entity based on its ID or map of unique field = value criteria.
+	 * @param int|string|array<string, mixed> $id
 	 */
-	public function find(array|int|string $id): Entity
+	public function find(int|string|array $id): Entity
 	{
 		if (!is_array($id)) {
 			if (count(static::$identity) > 1) {
@@ -119,12 +146,13 @@ abstract class Repository
 			));
 		}
 
-		return $result->setEntity(static::$entity)->getRecord(0);
+		return $result->of(static::$entity)->getRecord(0);
 	}
 
 
 	/**
-     *
+	 * Find all entities with optional ordering
+	 * @param array<string, string> $order
 	 */
 	public function findAll(array $order = array()): Result
 	{
@@ -133,16 +161,18 @@ abstract class Repository
 
 
 	/**
-	 *
+	 * Find entities based on a set of simple field = value critier, with optional ordering, limit, and page
+	 * @param array<string, mixed> $criteria
+	 * @param array<string, string> $order
 	 */
 	public function findBy(array $criteria, array $order = array(), int $limit = NULL, int $page = NULL): Result
 	{
-		$query      = new Query();
+		$sorts      = array();
 		$conditions = array();
-		$order_bys  = array();
+		$query     = new SelectQuery(static::$table);
 
 		foreach ($criteria as $field => $value) {
-			if (!isset($this->map[$field])) {
+			if (!isset($this->mapping[$field])) {
 				// throw
 			}
 
@@ -154,27 +184,27 @@ abstract class Repository
 		}
 
 		foreach ($order as $field => $value) {
-			if (!isset($this->map[$field])) {
+			if (!isset($this->mapping[$field])) {
 				// throw
 			}
 
-			$order_bys[] = $query->sort($field, $value);
+			$sorts[] = $query->sort($field, $value);
 		}
 
 		$result = $this->database->execute(
-			$query("SELECT * FROM @table @where ORDER BY @order @limit @start")
-				->raw('table', static::$table)
-				->raw('where', $query->where(...$conditions))
-				->raw('order', $query->order(...$order_bys))
-				->raw('limit', $query->limit($limit))
-				->raw('start', $query->offset(($page - 1) * $limit))
+			$query
+				->cols('*')
+				->where(...$conditions)
+				->order(...$sorts)
+				->limit($limit)
+				->offset(($page - 1) * $limit)
 		);
 
 		if ($result->isError()) {
 			// throw
 		}
 
-		return $result->setEntity(static::$entity);
+		return $result->of(static::$entity);
 	}
 }
 
