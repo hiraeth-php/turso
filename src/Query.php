@@ -18,6 +18,12 @@ class Query
 	protected $bind = ', ';
 
 	/**
+	 * A list of raws which have been identified as name values for possible translation
+	 * @var array<string>
+	 */
+	protected $names = array();
+
+	/**
 	 * The raw values for the query template (preceded by @ in template)
 	 * @var array<string, string|array<string>>
 	 */
@@ -70,22 +76,35 @@ class Query
 	public function __toString(): string
 	{
 		$tmpl = $this->tmpl;
+		$raws = array();
 
-		foreach ($this->raws as $name => $value) {
-			if (is_array($value)) {
-				$value = implode($this->bind, $value);
+		if (count($this->raws) && preg_match_all('/\@[^\s\@]+(\s*)/', $tmpl, $raws)) {
+			$swaps = array();
 
-				if ($this->wrap) {
-					$value = sprintf('(%s)', $value);
+			foreach ($raws[0] as $i => $raw) {
+				$ref = trim($raw, '@ ');
+
+				if (!isset($this->raws[$ref])) {
+					$swaps[$raw] = '';
+				} else {
+					$value = $this->raws[$ref];
+
+					if (is_array($value)) {
+						$value = implode($this->bind, $value);
+
+						if ($this->wrap) {
+							$value = sprintf('(%s)', $value);
+						}
+					}
+
+					$swaps[$raw] = $value . $raws[1][$i];
 				}
 			}
 
-			$tmpl = preg_replace('/\@' . preg_quote($name, '/') . '\s*/', $value . ' ', $tmpl);
+			$tmpl = str_replace(array_keys($swaps), $swaps, $tmpl);
 		}
 
-		$tmpl = preg_replace('/\s+\@.+\s+/', '', $tmpl);
-
-		if (preg_match_all('/\{\s*[^}]+\s*\}/', $tmpl, $matches)) {
+		if (count($this->vars) && preg_match_all('/\{\s*[^}]+\s*\}/', $tmpl, $matches)) {
 			$matches = array_unique($matches[0]);
 			$symbols = array_map(fn($match) => trim($match, ' {}'), $matches);
 			$invalid = array_diff(array_keys($this->vars), $symbols);
@@ -170,13 +189,60 @@ class Query
 
 
 	/**
+	 *
+	 */
+	public function map(array $mapping): self
+	{
+		$map = function($name) use ($mapping) {
+			if (!isset($mapping[$name])) {
+				// throw
+			}
+
+			return $mapping[$name];
+		};
+
+		foreach ($this->raws as $ref => $raw) {
+			if (is_array($raw)) {
+				foreach ($raw as $sub_raw) {
+					if ($sub_raw instanceof self) {
+						$sub_raw->map($mapping);
+					}
+				}
+			}
+
+			if ($raw instanceof self) {
+				$raw->map($mapping);
+			}
+		}
+
+		foreach ($this->names as $i => $ref) {
+			$raw = $this->raws[$ref];
+
+			if (is_array($raw)) {
+				$this->raws[$ref] = array_map($map, $this->raws[$ref]);
+			} else {
+				$this->raws[$ref] = $map($this->raws[$ref]);
+			}
+
+			unset($this->names[$i]);
+		}
+
+		return $this;
+	}
+
+
+	/**
 	 * Add a raw value to the query
 	 * If the value is an array they will be bound/wrapped by default
-	 * @param string|array<string> $value
+	 * @param self|string|array<self|string> $value
 	 */
-	public function raw(string $name, string|array $value): static
+	public function raw(string $ref, self|string|array $value, bool $name = FALSE): static
 	{
-		$this->raws[$name] = $value;
+		$this->raws[$ref] = $value;
+
+		if ($name) {
+			$this->names[] = $ref;
+		}
 
 		return $this;
 	}
@@ -185,9 +251,9 @@ class Query
 	/**
 	 * Add an escapable variable to the query
 	 */
-	public function var(string $name, mixed $value): static
+	public function var(string $ref, mixed $value): static
 	{
-		$this->vars[$name] = $value;
+		$this->vars[$ref] = $value;
 
 		return $this;
 	}

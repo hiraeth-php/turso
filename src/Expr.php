@@ -27,6 +27,6 @@ class Expr extends Query
 	 */
 	public function eq(string $name, mixed $value): Query
 	{
-		return $this('@name = {value}')->raw('name', $name)->var('value', $value);
+		return $this('@name = {value}')->raw('name', $name, TRUE)->var('value', $value);
 	}
 }

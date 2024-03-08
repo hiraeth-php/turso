@@ -12,7 +12,7 @@ class InsertQuery extends Query
 	 */
 	public function __construct(string $table)
 	{
-		parent::__construct('INSERT INTO @table @cols VALUES @values');
+		parent::__construct('INSERT INTO @table @names VALUES @values');
 
 		$this->raw('table', $table);
 	}
@@ -22,7 +22,7 @@ class InsertQuery extends Query
 	 */
 	public function values(array $values): static
 	{
-		$this->raw('cols', array_keys($values));
+		$this->raw('names', array_keys($values));
 		$this->raw('values', array_map(fn($value) => $this->esc($value), $values));
 
 		return $this;

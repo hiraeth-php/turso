@@ -7,12 +7,12 @@ use RuntimeException;
 
 /**
  * Repositories are responsible for easily interfacing with common SQL operations using entities
+ * @template T of Entity
  */
 abstract class Repository
 {
 	/**
 	 * The entity class for which this repository operates
-	 * @var class-string
 	 */
 	static protected $entity;
 
@@ -122,9 +122,9 @@ abstract class Repository
 
 
 	/**
-	 *
+	 * @return T
 	 */
-	public function create(array $values = array())
+	public function create(array $values = array()): Entity
 	{
 		$entity  = new static::$entity();
 		$fields  = $entity::_inspect();
@@ -237,7 +237,7 @@ abstract class Repository
 		return $this->select(
 			function(Selectquery $query) use ($conditions, $sorts, $limit, $page) {
 				$query
-					->cols('*')
+					->fetch('*')
 					->where(...$conditions)
 					->order(...$sorts)
 					->limit($limit)
@@ -245,6 +245,24 @@ abstract class Repository
 				;
 			}
 		);
+	}
+
+
+	/**
+	 *
+	 */
+	public function getEntity(): string
+	{
+		return static::$entity;
+	}
+
+
+	/**
+	 *
+	 */
+	public function getTable(): string
+	{
+		return static::$table;
 	}
 
 
@@ -282,9 +300,9 @@ abstract class Repository
 	{
 		$query = new SelectQuery(static::$table);
 
-		$builder($query);
+		$builder($query->fetch('*'));
 
-		$result = $this->database->execute($query);
+		$result = $this->database->execute($query->map(['*' => '*'] + $this->mapping));
 
 		return $this->database
 			->dieOnError($result, 'Failed selecting records')

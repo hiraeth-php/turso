@@ -27,7 +27,7 @@ class Association
 
 	/**
 	 * The target table name with the associated entities
-	 * @var string
+	 * @var string|Repository
 	 */
 	protected $target;
 
@@ -41,7 +41,7 @@ class Association
 	/**
 	 * Create a new association
 	 */
-	public function __construct(Database $database, Entity $source, string $target, ?string $through = NULL)
+	public function __construct(Database $database, Entity $source, string|Repository $target, ?string $through = NULL)
 	{
 		$this->database = $database;
 		$this->source   = $source;
@@ -55,9 +55,13 @@ class Association
 	 * @param array<string, string> $map
 	 * @param class-string $class
 	 */
-	public function hasMany(array $map, string $class, bool $refresh = FALSE): Result
+	public function hasMany(array $map, bool $refresh = FALSE, string $class = Entity::class): Result
 	{
-		$key = sha1(sprintf('%s:%s@%s', __FUNCTION__, $class, serialize($map)));
+		if ($this->target instanceof Repository && $class == Entity::class) {
+			$class = $this->target->getEntity();
+		}
+
+		$key = sha1(sprintf('%s@%s', __FUNCTION__, serialize($map)));
 
 		if (!isset($this->cache[$key]) || $refresh) {
 			$this->cache[$key] = $this->database
@@ -78,9 +82,13 @@ class Association
 	 * @param array<string, string> $map
 	 * @param class-string $class
 	 */
-	public function hasOne(array $map, string $class, bool $refresh = FALSE): ?Entity
+	public function hasOne(array $map, bool $refresh = FALSE, string $class = Entity::class ): ?Entity
 	{
-		$key = sha1(sprintf('%s:%s@%s', __FUNCTION__, $class, serialize($map)));
+		if ($this->target instanceof Repository && $class == Entity::class) {
+			$class = $this->target->getEntity();
+		}
+
+		$key = sha1(sprintf('%s@%s', __FUNCTION__, serialize($map)));
 
 		if (!isset($this->cache[$key]) || $refresh) {
 			$this->cache[$key] = $this->database
@@ -103,6 +111,12 @@ class Association
 	 */
 	protected function getResult(array $map): Result
 	{
+		if ($this->target instanceof Repository) {
+			$target = $this->target->getTable();
+		} else {
+			$target = $this->target;
+		}
+
 		if ($this->through) {
 			$keys   = array_keys($map);
 			$field  = $keys[0];
@@ -113,7 +127,7 @@ class Association
 					'value' => $value
 				],
 				[
-					'target'  => $this->target,
+					'target'  => $target,
 					'remote'  => $map[$keys[1]],
 					'link'    => $keys[1],
 					'through' => $this->through,
@@ -130,7 +144,7 @@ class Association
 					'value' => $value
 				],
 				[
-					'target' => $this->target,
+					'target' => $target,
 					'column' => $map[$field]
 				]
 			);

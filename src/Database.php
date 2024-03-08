@@ -87,7 +87,9 @@ class Database
 
 	/**
 	 * Get a repository by its class name
-	 * @param class-string $class
+	 * @template T of Repository
+	 * @param class-string<T> $class
+	 * @return T
 	 */
 	public function getRepository(string $class): Repository
 	{

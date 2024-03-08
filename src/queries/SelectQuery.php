@@ -11,7 +11,7 @@ class SelectQuery extends WhereQuery
 	 */
 	public function __construct(string $table)
 	{
-		parent::__construct('SELECT @cols FROM @table @where @order @limit @offset');
+		parent::__construct('SELECT @names FROM @table @where @order @limit @offset');
 
 		$this->raw('table', $table);
 	}
@@ -20,9 +20,9 @@ class SelectQuery extends WhereQuery
 	/**
 	 *
 	 */
-	public function cols(string ...$names): static
+	public function fetch(string ...$names): static
 	{
-		$this->raw('cols', $this('@names')->bind(', ', FALSE)->raw('names', $names));
+		$this->raw('names', $this('@names')->bind(', ', FALSE)->raw('names', $names, TRUE));
 
 		return $this;
 	}
@@ -80,10 +80,10 @@ class SelectQuery extends WhereQuery
 
 
 	/**
-	 * Create a new query fragment in the style: @field @direction
+	 * Create a new query fragment in the style: @name @direction
 	 * Direction must be variation of 'asc' or 'desc' or an exception will be thrown
 	 */
-	public function sort(string $field, string $direction = 'ASC'): Query
+	public function sort(string $name, string $direction = 'ASC'): Query
 	{
 		$direction = strtoupper($direction);
 
@@ -94,6 +94,6 @@ class SelectQuery extends WhereQuery
 			));
 		}
 
-		return $this('@field @direction')->raw('field', $field)->raw('direction', $direction);
+		return $this('@name @direction')->raw('name', $name, TRUE)->raw('direction', $direction);
 	}
 }

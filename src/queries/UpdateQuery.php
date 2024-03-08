@@ -27,7 +27,7 @@ class UpdateQuery extends WhereQuery
 			->raw('assignments', $assignments)
 		;
 
-		$this->raw('assign', $assignments);
+		$this->raw('assignments', $assignments);
 
 		return $this;
 	}
