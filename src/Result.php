@@ -141,18 +141,15 @@ class Result implements Countable, Iterator
 
 	/**
 	 * Get a record at a given position/index
-	 * @param class-string $class
 	 */
-	public function getRecord(int $index, string $class = Entity::class): ?Entity
+	public function getRecord(int $index): ?Entity
 	{
 		$data = $this->content['results'][0]['response']['result']['rows'][$index]
 			?? NULL;
 
 		if ($data) {
-			$this->of($class);
-
 			if (!isset($this->cache[$index])) {
-				$this->cache[$index] = $class::_create(
+				$this->cache[$index] = $this->entity::_create(
 					$this->database,
 					array_combine(
 						$this->mapping,
@@ -171,9 +168,8 @@ class Result implements Countable, Iterator
 	/**
 	 * Get all the records as an array
 	 * @param class-string $class
-	 * @return array<int, Entity>
 	 */
-	public function getRecords(string $class = Entity::class): array
+	public function getRecords(): array
 	{
 		return array_map(
 			fn($index) => $this->getRecord($index, $class),
