@@ -8,6 +8,12 @@ namespace Hiraeth\Turso;
 class Association
 {
 	/**
+	 * A cache for associated entities and results
+	 * @var array<string, Result|Entity>
+	 */
+	protected $cache = array();
+
+	/**
 	 * The database to use to fulfill the associations
 	 * @var Database
 	 */
@@ -49,15 +55,21 @@ class Association
 	 * @param array<string, string> $map
 	 * @param class-string $class
 	 */
-	public function hasMany(array $map, string $class): Result
+	public function hasMany(array $map, string $class, bool $refresh = FALSE): Result
 	{
-		return $this->database
-			->dieOnError(
-				$this->getResult($map),
-				'Could fulfill *-to-many association'
-			)
-			->of($class)
-		;
+		$key = sha1(sprintf('%s:%s@%s', __FUNCTION__, $class, serialize($map)));
+
+		if (!isset($this->cache[$key]) || $refresh) {
+			$this->cache[$key] = $this->database
+				->dieOnError(
+					$this->getResult($map),
+					'Could not fulfill *-to-many association'
+				)
+				->of($class)
+			;
+		}
+
+		return $this->cache[$key];
 	}
 
 
@@ -66,16 +78,22 @@ class Association
 	 * @param array<string, string> $map
 	 * @param class-string $class
 	 */
-	public function hasOne(array $map, string $class): ?Entity
+	public function hasOne(array $map, string $class, bool $refresh = FALSE): ?Entity
 	{
-		return $this->database
-			->dieOnError(
-				$this->getResult($map),
-				'Could not fulfill *-to-one association'
-			)
-			->of($class)
-			->getRecord(0, $class)
-		;
+		$key = sha1(sprintf('%s:%s@%s', __FUNCTION__, $class, serialize($map)));
+
+		if (!isset($this->cache[$key]) || $refresh) {
+			$this->cache[$key] = $this->database
+				->dieOnError(
+					$this->getResult($map),
+					'Could not fulfill *-to-one association'
+				)
+				->of($class)
+				->getRecord(0)
+			;
+		}
+
+		return $this->cache[$key];
 	}
 
 

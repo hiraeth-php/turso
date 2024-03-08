@@ -40,7 +40,7 @@ class Result implements Countable, Iterator
 	 * The entity class to which results should be mapped
 	 * @var class-string
 	 */
-	protected $entity;
+	protected $entity = NULL;
 
 	/**
 	 * The cached mapping of columns to entity fields when entity is set using as()
@@ -149,6 +149,10 @@ class Result implements Countable, Iterator
 
 		if ($data) {
 			if (!isset($this->cache[$index])) {
+				if (!$this->entity) {
+					$this->of(Entity::class);
+				}
+
 				$this->cache[$index] = $this->entity::_create(
 					$this->database,
 					array_combine(
@@ -172,7 +176,7 @@ class Result implements Countable, Iterator
 	public function getRecords(): array
 	{
 		return array_map(
-			fn($index) => $this->getRecord($index, $class),
+			fn($index) => $this->getRecord($index),
 			range(0, count($this) - 1)
 		);
 	}
@@ -203,9 +207,9 @@ class Result implements Countable, Iterator
 	public function isError(): bool
 	{
 		$type = $this->content['results'][0]['type']
-			?? null;
+			?? 'ok';
 
-		return $type && $type != 'ok';
+		return $type != 'ok';
 	}
 
 
@@ -255,13 +259,14 @@ class Result implements Countable, Iterator
 		} else {
 			$fields = $class::_inspect();
 
-			foreach ($fields as $i => $field) {
-				foreach ($columns as $j => $column) {
+
+			foreach ($columns as $i => $column) {
+				foreach ($fields as $j => $field) {
 					$column = preg_replace('/[^a-z0-9]/', '', strtolower($column));
 					$field  = preg_replace('/[^a-z0-9]/', '', strtolower($field));
 
 					if ($column == $field) {
-						$this->mapping[$columns[$j]] = $fields[$i];
+						$this->mapping[$columns[$i]] = $fields[$j];
 					}
 				}
 			}

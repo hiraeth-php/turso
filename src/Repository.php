@@ -85,7 +85,6 @@ abstract class Repository
 			));
 		}
 
-
 		$fields  = static::$entity::_inspect();
 		$columns = array_map(
 			fn($column) => $column['name'],
@@ -121,10 +120,29 @@ abstract class Repository
 
 
 	/**
+	 *
+	 */
+	public function delete(Entity $entity): Result
+	{
+		$query = new DeleteQuery(static::$table);
+		$ident = array();
+
+		foreach (static::$identity as $field) {
+			$column  = $this->mapping[$field];
+			$ident[] = $query->eq($column, $entity->$field);
+		}
+
+		$result = $this->database->execute($query->where(...$ident));
+
+		return $this->database->dieOnError($result, 'Failed removing record');
+	}
+
+
+	/**
 	 * Find a single entity based on its ID or map of unique field = value criteria.
 	 * @param int|string|array<string, mixed> $id
 	 */
-	public function find(int|string|array $id): Entity
+	public function find(int|string|array $id): ?Entity
 	{
 		if (!is_array($id)) {
 			if (count(static::$identity) > 1) {
@@ -169,42 +187,79 @@ abstract class Repository
 	{
 		$sorts      = array();
 		$conditions = array();
-		$query     = new SelectQuery(static::$table);
-
-		foreach ($criteria as $field => $value) {
-			if (!isset($this->mapping[$field])) {
-				// throw
-			}
-
-			$conditions[] = $query->eq($field, $value);
-		}
+		$query      = new SelectQuery(static::$table);
 
 		if (!$order) {
 			$order = static::$order;
 		}
 
-		foreach ($order as $field => $value) {
-			if (!isset($this->mapping[$field])) {
-				// throw
-			}
+		foreach ($criteria as $field => $value) {
+			$conditions[] = $query->eq($field, $value);
+		}
 
+		foreach ($order as $field => $value) {
 			$sorts[] = $query->sort($field, $value);
 		}
 
-		$result = $this->database->execute(
-			$query
-				->cols('*')
-				->where(...$conditions)
-				->order(...$sorts)
-				->limit($limit)
-				->offset(($page - 1) * $limit)
+		return $this->select(
+			function(Selectquery $query) use ($conditions, $sorts, $limit, $page) {
+				$query
+					->cols('*')
+					->where(...$conditions)
+					->order(...$sorts)
+					->limit($limit)
+					->offset(($page - 1) * $limit)
+				;
+			}
 		);
+	}
 
-		if ($result->isError()) {
-			// throw
+
+	/**
+	 *
+	 */
+	public function select(callable $builder): Result
+	{
+		$query = new SelectQuery(static::$table);
+
+		$builder($query);
+
+		$result = $this->database->execute($query);
+
+		return $this->database
+			->dieOnError($result, 'Failed selecting records')
+			->of(static::$entity)
+		;
+	}
+
+
+	/**
+	 *
+	*/
+	public function update(Entity $entity): Result
+	{
+		$query  = new UpdateQuery(static::$table);
+		$values = $entity::_diff($entity, TRUE);
+		$ident  = array();
+		$sets   = array();
+
+		if (!$values) {
+			return new Result('NULL', $this->database, []);
 		}
 
-		return $result->of(static::$entity);
+		foreach (static::$identity as $field) {
+			$column  = $this->mapping[$field];
+			$ident[] = $query->eq($column, $entity->$field);
+		}
+
+		foreach ($values as $field => $value) {
+			$column = $this->mapping[$field];
+			$sets[] = $query->eq($column, $value);
+		}
+
+		$result = $this->database->execute($query->set(...$sets)->where(...$ident));
+
+		return $this->database->dieOnError($result, 'Failed updating record');
 	}
 }
 
