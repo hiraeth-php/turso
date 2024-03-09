@@ -167,13 +167,13 @@ Typed entities are simply custom classes which extend the `Hiraeth\Turso\Entity`
 class User extends Hiraeth\Turso\Entity
 {
     protected id;
-    
+
     public firstName;
-    
+
     public lastName;
 
     public email;
-    
+
     public function fullName()
     {
         return trim(sprintf(
@@ -335,14 +335,14 @@ public function occupation(bool|Occupation $refresh = FALSE): ?Occupation
             'id' => 'occupation'
         ]);
     }
-    
+
     return $this('occupations')->hasOne(
     	[
             'occupation' => 'id'
         ],
         $refresh,
         Occupation::class
-    );    
+    );
 }
 ```
 
@@ -360,9 +360,9 @@ $user->occupation($occupation);
 
 This would:
 
-	1. Update the `occupation` property on the `User` to match the id of the `Occupation`
-	1. Update `users` table to set the occupation column to the id of the Occupation
-	1. Update the cache with the new occupation and return it.
+1. Update the `occupation` property on the `User` to match the id of the `Occupation`
+2. Update `users` table to set the occupation column to the id of the Occupation
+3. Update the cache with the new occupation and return it.
 
 ##### Guard Clauses
 
@@ -380,12 +380,12 @@ class Users extends Hiraeth\Turso\Repository
     const table = 'users';
 
     const entity = User::class;
-    
+
     const order = [
         'firstName' => 'asc',
         'lastName'  => 'asc'
     ]
-    
+
     const identity = ['id'];
 }
 ```
@@ -466,9 +466,9 @@ $result = $users->update($user);
 
 Upon calling:
 
-	1. A "diff" will be performed on the current property values and the original values obtained when the entity was instantiated by the repository.
-	1. The user's corresponding `first_name` column (the only column that changed) will be updated via standard `UPDATE` query.
-	1. The change will be pushed to the `$_values` property such that the updated information is now considered to reflect what's in the database.
+1. A "diff" will be performed on the current property values and the original values obtained when the entity was instantiated by the repository.
+2. The user's corresponding `first_name` column (the only column that changed) will be updated via standard `UPDATE` query.
+3. The change will be pushed to the `$_values` property such that the updated information is now considered to reflect what's in the database.
 
 ##### Success?
 
