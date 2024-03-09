@@ -115,23 +115,17 @@ class Association
 	 */
 	protected function getResult(array $map): Result
 	{
-		if (is_a($this->target, Entity::class, TRUE)) {
-			$table = $this->target::table;
-		} else {
-			$table = $this->target;
-		}
-
 		if ($this->through) {
 			$keys   = array_keys($map);
 			$field  = $keys[0];
 			$value  = $this->source->$field;
 			$result = $this->database->execute(
-				"SELECT * FROM @target WHERE @remote IN( SELECT @link FROM @through WHERE @local = {value} )",
+				"SELECT * FROM @table WHERE @remote IN( SELECT @link FROM @through WHERE @local = {value} )",
 				[
 					'value' => $value
 				],
 				[
-					'table'  => $table,
+					'table'   => $this->target::table,
 					'remote'  => $map[$keys[1]],
 					'link'    => $keys[1],
 					'through' => $this->through,
@@ -143,12 +137,12 @@ class Association
 			$field  = key($map);
 			$value  = $this->source->$field;
 			$result = $this->database->execute(
-				"SELECT * FROM @target WHERE @column = {value}",
+				"SELECT * FROM @table WHERE @column = {value}",
 				[
 					'value' => $value
 				],
 				[
-					'table' => $table,
+					'table' => $this->target::table,
 					'column' => $map[$field]
 				]
 			);

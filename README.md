@@ -107,10 +107,7 @@ if ($result->isError()) {
 It's also possible to just easily throw `\RuntimeException` with a custom message prepended:
 
 ```php
-$databse->dieOnError(
-    $result,
-    'Failed executing the query'
-);
+$result->throw('Failed executing the query');
 ```
 
 Assuming there was no error, let's get into how to use the results.
@@ -220,20 +217,19 @@ Typed entities have another benefit.  Namely, they can easily obtain related ent
 ```php
 public function occupation()
 {
-    return $this('occupations')->hasOne(
+    return $this(Occupation::class)->hasOne(
         [
             'occupation' => 'id'
         ],
-        FALSE,
-        Occupation::class
+        FALSE
     );
 }
 ```
 
-In the above example, when we call `User::occupation()` we will obtain the `Occupation` who's `id` corresponds to the `occupation` on the `User`.   Let's go through this step by step.  Firstly, a new association to the `occupations` table is instantiated.
+In the above example, when we call `User::occupation()` we will obtain the `Occupation` who's `id` corresponds to the `occupation` on the `User`.   Let's go through this step by step.  Firstly, a new association to the `Occupation` type is instantiated.
 
 ```php
-$this('occupations')
+$this(Occupation::class)
 ```
 
 We then use that association to retrieve a single record via `hasOne()`.  The first property contains a mapping of how we get from the `User` to the `Occupation`:
@@ -251,19 +247,18 @@ The second argument to the `hasOne()` method tells the association not to _refre
 ```php
 public function occupation(bool $refresh = FALSE): ?Occupation
 {
-    return $this('occupations')->hasOne(
+    return $this(Occupation::class)->hasOne(
         [
             'occupation' => 'id'
         ],
-        $refresh,
-        Occupation::class
+        $refresh
     );
 }
 ```
 
-Finally, the third argument to the `hasOne()` method tells the association to cast the returned result as an `Occupation`.  In the event of a *-to-one association, the returned value will always be either the corresponding entity or `NULL` if the person does not have an associated record.
+In the event of a *-to-one association, the returned value will always be either the corresponding entity type or `NULL` if the person does not have an associated record.
 
-Now that we have a basic idea, let's move on to the others, which will look very similar.
+Now that we have a basic idea, let's move on to the others, which will look very similar. 
 
 #### One-to-Many
 
@@ -272,12 +267,11 @@ On the inverse side of our `User` example, we can imagine the following on our `
 ```php
 public function users(bool $refresh = FALSE): Result
 {
-    return $this('users')->hasMany(
+    return $this(User::class)->hasMany(
         [
             'id' => 'occupation'
         ],
-        $refresh,
-        User::class
+        $refresh
     );
 }
 ```
@@ -301,12 +295,11 @@ The major difference between the previous examples and this one is that we need 
 ```php
 public function friends($bool $refresh = FALSE): Result
 {
-    return $this('users', 'friends')->hasMany(
+    return $this(User::class, 'friends')->hasMany(
         [
             'id' => 'user', 'friend' => 'id'
         ],
-        $refresh,
-        self::class
+        $refresh
     );
 }
 ```
@@ -333,17 +326,16 @@ Fundamentals have been laid to enable setting associated records which will auto
 public function occupation(bool|Occupation $refresh = FALSE): ?Occupation
 {
     if ($refresh instanceof Occupation) {
-        $this('occupations')->changeOne($refresh, [
+        $this(Occupation::class)->changeOne($refresh, [
             'id' => 'occupation'
         ]);
     }
 
-    return $this('occupations')->hasOne(
+    return $this(Occupation::class)->hasOne(
         [
             'occupation' => 'id'
         ],
-        $refresh,
-        Occupation::class
+    	$refresh
     );
 }
 ```
