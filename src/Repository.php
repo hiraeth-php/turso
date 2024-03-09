@@ -71,7 +71,7 @@ abstract class Repository
 		}
 
 		$result = $this->database
-			->execute("SELECT * FROM @table LIMIT 1", [], [ 'table' => static::entity::table ])
+			->execute("SELECT * FROM @table LIMIT 1", [], ['table' => static::entity::table])
 		;
 
 		if ($result->isError()) {

@@ -50,6 +50,11 @@ class Database
 	 */
 	protected $token;
 
+	/**
+	 * @var bool
+	 */
+	public $debug = FALSE;
+
 
 	/**
 	 * Create a new Database instance
@@ -96,6 +101,7 @@ class Database
 		$handle  = fopen('php://memory', 'w');
 
 		if ($handle) {
+			$query   = new Query($sql, $params, $identifiers);
 			$stream  = new Stream($handle);
 			$uri     = new Uri(sprintf(
 				'https://%s-%s.turso.io%s',
@@ -106,16 +112,21 @@ class Database
 
 			$stream->write(json_encode([
 				"requests" => [
-					[ "type" => "execute", "stmt" => [ "sql" => (string) new Query($sql, $params, $identifiers) ] ],
+					[ "type" => "execute", "stmt" => [ "sql" => (string) $query ] ],
 					[ "type" => "close" ]
 				]
 			]) ?: '');
 
 			$response = $this->client->sendRequest(new Request('POST', $uri, $headers, $stream));
+			$result   = new Result($query, $this, json_decode($response->getBody()->getContents(), TRUE), $type);
 
 			fclose($handle);
 
-			return new Result($sql, $this, json_decode($response->getBody()->getContents(), TRUE), $type);
+			if ($this->debug) {
+				echo PHP_EOL . $result->getSQL() . PHP_EOL;
+			}
+
+			return $result;
 		}
 
 		throw new RuntimeException(sprintf(
