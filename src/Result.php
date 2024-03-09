@@ -8,13 +8,14 @@ use InvalidArgumentException;
 use RuntimeException;
 
 /**
- * @implements Iterator<int, Entity>
+ * @template T of Entity
+ * @implements Iterator<int, T>
  */
 class Result implements Countable, Iterator
 {
 	/**
 	 * Cache of entity objects, will be erased if entity is re-cast using as()
-	 * @var array<Entity>
+	 * @var array<T>
 	 */
 	protected $cache = array();
 
@@ -38,12 +39,12 @@ class Result implements Countable, Iterator
 
 	/**
 	 * The entity class to which results should be mapped
-	 * @var class-string
+	 * @var class-string<T>|class-string
 	 */
-	protected $entity = NULL;
+	protected $entity;
 
 	/**
-	 * The cached mapping of columns to entity fields when entity is set using as()
+	 * The cached mapping of columns to entity fields when entity is set using of()
 	 * @var array<string, string>
 	 */
 	protected $mapping = array();
@@ -58,12 +59,23 @@ class Result implements Countable, Iterator
 	/**
 	 * Create a new Result instance
 	 * @param array<mixed> $content
+	 * @param bool|class-string<T> $class
 	 */
-	public function __construct(string $sql, Database $database, array $content)
+	public function __construct(string $sql, Database $database, array $content, bool|string $class = Entity::class)
 	{
 		$this->sql      = $sql;
 		$this->database = $database;
 		$this->content  = $content;
+
+		if ($class === TRUE || $class == Entity::class) {
+			$columns = array_map(
+				fn($col) => $col['name'],
+				$content['results'][0]['response']['result']['cols'] ?? []
+			);
+
+			$this->entity  = Entity::class;
+			$this->mapping = array_combine($columns, $columns);
+		}
 	}
 
 
@@ -85,6 +97,7 @@ class Result implements Countable, Iterator
 
 	/**
 	 * {@inheritDoc}
+	 * @return T|null
 	 */
 	public function current(): ?Entity
 	{
@@ -95,21 +108,21 @@ class Result implements Countable, Iterator
 	/**
      * Get the number of affected rows (for insert, delete, update)
 	 */
-	public function getAffectedRows(): ?int
+	public function getAffectedRows(): int
 	{
 		if ($this->isError()) {
-			return NULL;
+			return 0;
 		}
 
 		return $this->content['results'][0]['response']['result']['affected_row_count']
-			?? NULL;
+			?? 0;
 	}
 
 
 	/**
      * Get the error from the result
 	 *
-     * @return object{'code': string, 'message': string}|null
+     * @return \stdClass|null
      */
 	public function getError(): ?object
 	{
@@ -141,6 +154,7 @@ class Result implements Countable, Iterator
 
 	/**
 	 * Get a record at a given position/index
+	 * @return T|null
 	 */
 	public function getRecord(int $index): ?Entity
 	{
@@ -149,10 +163,6 @@ class Result implements Countable, Iterator
 
 		if ($data) {
 			if (!isset($this->cache[$index])) {
-				if (!$this->entity) {
-					$this->of(Entity::class);
-				}
-
 				$this->cache[$index] = $this->entity::_create(
 					$this->database,
 					array_combine(
@@ -171,7 +181,7 @@ class Result implements Countable, Iterator
 
 	/**
 	 * Get all the records as an array
-	 * @param class-string $class
+	 * @return array<T>
 	 */
 	public function getRecords(): array
 	{
@@ -233,7 +243,9 @@ class Result implements Countable, Iterator
 
 	/**
 	 * Cast the result as a typed DTO
-	 * @param class-string $class
+	 * @template C of Entity
+	 * @param class-string<C> $class
+	 * @return Result<C>
 	 */
 	public function of(string $class): self
 	{
@@ -241,47 +253,42 @@ class Result implements Countable, Iterator
 			return $this;
 		}
 
-		if (!is_a($class, Entity::class, TRUE)) {
+		if (!is_subclass_of($class, Entity::class, TRUE)) {
 			throw new InvalidArgumentException(sprintf(
 				'Cannot instantiate results, "%s" is not an entity.',
 				$class
 			));
 		}
 
+		$mapping = array();
+		$fields  = $class::_inspect();
 		$columns = array_map(
 			fn($col) => $col['name'],
 			$this->content['results'][0]['response']['result']['cols'] ?? []
 		);
 
-		if ($class == Entity::class) {
-			$this->mapping = array_combine($columns, $columns);
+		foreach ($columns as $i => $column) {
+			foreach ($fields as $j => $field) {
+				$column = preg_replace('/[^a-z0-9]/', '', strtolower($column));
+				$field  = preg_replace('/[^a-z0-9]/', '', strtolower($field));
 
-		} else {
-			$fields = $class::_inspect();
-
-
-			foreach ($columns as $i => $column) {
-				foreach ($fields as $j => $field) {
-					$column = preg_replace('/[^a-z0-9]/', '', strtolower($column));
-					$field  = preg_replace('/[^a-z0-9]/', '', strtolower($field));
-
-					if ($column == $field) {
-						$this->mapping[$columns[$i]] = $fields[$j];
-					}
+				if ($column == $field) {
+					$mapping[(string) $columns[$i]] = $fields[$j];
 				}
-			}
-
-			if (count($this->mapping) != count($columns)) {
-				throw new RuntimeException(sprintf(
-					'Missing properties %s, when trying to cast result as "%s"',
-					implode(', ', array_diff($columns, array_keys($this->mapping))),
-					$class
-				));
 			}
 		}
 
-		$this->cache  = array();
-		$this->entity = $class;
+		if (count($mapping) != count($columns)) {
+			throw new RuntimeException(sprintf(
+				'Missing properties %s, when trying to cast result as "%s"',
+				implode(', ', array_diff($columns, array_keys($this->mapping))),
+				$class
+			));
+		}
+
+		$this->cache   = array();
+		$this->mapping = $mapping;
+		$this->entity  = $class;
 
 		return $this;
 	}
@@ -293,6 +300,31 @@ class Result implements Countable, Iterator
 	public function rewind(): void
 	{
 		$this->cursor = 0;
+	}
+
+
+	/**
+	 * Dies with a RuntimeException if the result is an error with an optional message
+	 * @return self<T>
+	 */
+	public function throw(string $message = NULL): self
+	{
+		if ($this->isError()) {
+			$error = sprintf(
+				'%s: %s in "%s"',
+				$this->getError()->code,
+				$this->getError()->message,
+				$this->getSQL()
+			);
+
+			if ($message) {
+				$error = $message . '(' . $error . ')';
+			}
+
+			throw new RuntimeException($error);
+		}
+
+		return $this;
 	}
 
 

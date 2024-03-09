@@ -25,7 +25,7 @@ class Query
 
 	/**
 	 * The raw values for the query template (preceded by @ in template)
-	 * @var array<string, string|array<string>>
+	 * @var array<string, string|Query|array<string|Query>>
 	 */
 	protected $raws = array();
 
@@ -189,7 +189,8 @@ class Query
 
 
 	/**
-	 *
+	 * Map any values signified as names to new names (usually just columns)
+	 * @param array<string, string> $mapping
 	 */
 	public function map(array $mapping): self
 	{
@@ -216,9 +217,7 @@ class Query
 		}
 
 		foreach ($this->names as $i => $ref) {
-			$raw = $this->raws[$ref];
-
-			if (is_array($raw)) {
+			if (is_array($this->raws[$ref])) {
 				$this->raws[$ref] = array_map($map, $this->raws[$ref]);
 			} else {
 				$this->raws[$ref] = $map($this->raws[$ref]);

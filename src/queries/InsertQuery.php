@@ -18,7 +18,8 @@ class InsertQuery extends Query
 	}
 
 	/**
-	 *
+	 * The values to be inserted
+	 * @param array<mixed> $values
 	 */
 	public function values(array $values): static
 	{

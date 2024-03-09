@@ -2,16 +2,26 @@
 
 namespace Hiraeth\Turso;
 
+use InvalidArgumentException;
+
 /**
  * Handles creating associations between entities or collections of them
+ * @template S of Entity
+ * @template T of Entity
  */
 class Association
 {
 	/**
 	 * A cache for associated entities and results
-	 * @var array<string, Result|Entity>
+	 * @var array<string, Result<T>>
 	 */
-	protected $cache = array();
+	protected $cacheResult = array();
+
+	/**
+	 * A cache for associated entities and results
+	 * @var array<string, T|null>
+	 */
+	protected $cacheEntity = array();
 
 	/**
 	 * The database to use to fulfill the associations
@@ -21,13 +31,13 @@ class Association
 
 	/**
 	 * The source entity
-	 * @var Entity
+	 * @var S $source
 	 */
 	protected $source;
 
 	/**
-	 * The target table name with the associated entities
-	 * @var string|Repository
+	 * The target entity type
+	 * @var class-string<T>
 	 */
 	protected $target;
 
@@ -40,9 +50,17 @@ class Association
 
 	/**
 	 * Create a new association
+	 * @param S $source
+	 * @param class-string<T> $target
 	 */
-	public function __construct(Database $database, Entity $source, string|Repository $target, ?string $through = NULL)
+	public function __construct(Database $database, Entity $source, string $target, ?string $through = NULL)
 	{
+		if (!is_subclass_of($target, Entity::class, TRUE)) {
+			throw new InvalidArgumentException(sprintf(
+				'Must be a subclass of entity'
+			));
+		}
+
 		$this->database = $database;
 		$this->source   = $source;
 		$this->target   = $target;
@@ -53,68 +71,54 @@ class Association
 	/**
 	 * Get a many related entities
 	 * @param array<string, string> $map
-	 * @param class-string $class
+	 * @return Result<T>
 	 */
-	public function hasMany(array $map, bool $refresh = FALSE, string $class = Entity::class): Result
+	public function hasMany(array $map, bool $refresh = FALSE): Result
 	{
-		if ($this->target instanceof Repository && $class == Entity::class) {
-			$class = $this->target::entity;
-		}
-
 		$key = sha1(sprintf('%s@%s', __FUNCTION__, serialize($map)));
 
-		if (!isset($this->cache[$key]) || $refresh) {
-			$this->cache[$key] = $this->database
-				->dieOnError(
-					$this->getResult($map),
-					'Could not fulfill *-to-many association'
-				)
-				->of($class)
+		if (!isset($this->cacheResult[$key]) || $refresh) {
+			$this->cacheResult[$key] = $this->getResult($map)
+				->throw('Could not fulfill *-to-many association')
 			;
 		}
 
-		return $this->cache[$key];
+		return $this->cacheResult[$key];
 	}
 
 
 	/**
 	 * Get a single related entity
 	 * @param array<string, string> $map
-	 * @param class-string $class
+	 * @return T|null
 	 */
-	public function hasOne(array $map, bool $refresh = FALSE, string $class = Entity::class ): ?Entity
+	public function hasOne(array $map, bool $refresh = FALSE): ?Entity
 	{
-		if ($this->target instanceof Repository && $class == Entity::class) {
-			$class = $this->target::entity;
-		}
-
 		$key = sha1(sprintf('%s@%s', __FUNCTION__, serialize($map)));
 
-		if (!isset($this->cache[$key]) || $refresh) {
-			$this->cache[$key] = $this->database
-				->dieOnError(
-					$this->getResult($map),
-					'Could not fulfill *-to-one association'
-				)
-				->of($class)
+		if (!isset($this->cacheEntity[$key]) || $refresh) {
+			$this->cacheEntity[$key] = $this->getResult($map)
+				->throw('Could not fulfill *-to-one association')
 				->getRecord(0)
 			;
 		}
 
-		return $this->cache[$key];
+
+		return $this->cacheEntity[$key];
 	}
 
 
 	/**
 	 * Actually fulfill an association request
 	 * @param array<string, string> $map
+	 * @return Result<T>
 	 */
 	protected function getResult(array $map): Result
 	{
-		if ($this->target instanceof Repository) {
-			$target = $this->target::entity::table;
+		if (is_a($this->target, Entity::class, TRUE)) {
+			$table = $this->target::table;
 		} else {
-			$target = $this->target;
+			$table = $this->target;
 		}
 
 		if ($this->through) {
@@ -127,7 +131,7 @@ class Association
 					'value' => $value
 				],
 				[
-					'target'  => $target,
+					'table'  => $table,
 					'remote'  => $map[$keys[1]],
 					'link'    => $keys[1],
 					'through' => $this->through,
@@ -144,14 +148,12 @@ class Association
 					'value' => $value
 				],
 				[
-					'target' => $target,
+					'table' => $table,
 					'column' => $map[$field]
 				]
 			);
-
 		}
 
-		return $result;
+		return $result->of($this->target);
 	}
-
 };

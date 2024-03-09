@@ -4,8 +4,10 @@ namespace Hiraeth\Turso;
 
 use RuntimeException;
 
+
 /**
  * The base Entity class to handle untyped DTOs or to extend
+ * @template T
  */
 class Entity
 {
@@ -17,7 +19,7 @@ class Entity
 
 	/**
 	 * A cache for associations
-	 * @var array<string, Association>
+	 * @var array<string, mixed>
 	 */
 	protected $_cache = array();
 
@@ -32,6 +34,67 @@ class Entity
      * @var array<string, mixed>
 	 */
 	protected $_values = array();
+
+
+	/**
+	 *
+	*/
+	final public function __construct()
+	{
+
+	}
+
+
+	/**
+	 * Invoke the class to get an association to another entity (optionally through a join)
+	 * @template TTarget of Entity
+	 * @param class-string<TTarget> $target
+	 * @return Association<$this, TTarget>
+	 */
+	final public function __invoke(string $target, string $through = NULL): Association
+	{
+		$key = sha1(sprintf('%s:%s', $target, $through ?: 'null'));
+
+		if (!isset($this->_cache[$key])) {
+			$this->_cache[$key] = new Association($this->_database, $this, $target, $through);
+		}
+
+		return $this->_cache[$key];
+	}
+
+
+	/**
+	 * Magic getter to get property values for untyped DTOs
+	 */
+	final public function __get(string $name): mixed
+	{
+		if (static::class != self::class) {
+			throw new RuntimeException(sprintf(
+				'Cannot get field on "%s", undeclared property "%s".',
+				static::class,
+				$name
+			));
+		}
+
+		return $this->_values[$name] ?? NULL;
+	}
+
+
+	/**
+	 * Magic setter to set property values for untyped DTOs
+	 */
+	final public function __set(string $name, mixed $value): void
+	{
+		if (static::class != self::class) {
+			throw new RuntimeException(sprintf(
+				'Cannot get field on "%s", undeclared property "%s".',
+				static::class,
+				$name
+			));
+		}
+
+		$this->_values[$name] = $value;
+	}
 
 
 	/**
@@ -83,31 +146,6 @@ class Entity
 
 
 	/**
-	 *
-	 */
-	final static public function _diff(Entity $entity, bool $reset = FALSE): array
-	{
-		if ($entity::class == Entity::class) {
-			return $entity->_values;
-		}
-
-		$values = array();
-
-		foreach ($entity::_inspect() as $field) {
-			if (!isset($entity->_values[$field]) || $entity->$field != $entity->_values[$field]) {
-				$values[$field] = $entity->$field;
-
-				if ($reset) {
-					$entity->_values[$field] = $entity->$field;
-				}
-			}
-		}
-
-		return $values;
-	}
-
-
-	/**
 	 * Inspect the entity to obtain a list of properties
 	 * @return array<string>
 	 */
@@ -121,50 +159,27 @@ class Entity
 
 
 	/**
-     * Invoke the class to get an association to another entity (optionally through a join)
+	 * Return the difference between original values and current property values
+	 * @return array<string, mixed>
 	 */
-	final public function __invoke(string $target, string $through = NULL): Association
+	final public function _diff(bool $reset = FALSE): array
 	{
-		$key = sha1(sprintf('%s:%s', $target, $through ?: 'null'));
-
-		if (!isset($this->_cache[$key])) {
-			$this->_cache[$key] = new Association($this->_database, $this, $target, $through);
+		if ($this::class == Entity::class) {
+			return $this->_values;
 		}
 
-		return $this->_cache[$key];
-	}
+		$values = array();
 
+		foreach ($this::_inspect() as $field) {
+			if (!isset($this->_values[$field]) || $this->$field != $this->_values[$field]) {
+				$values[$field] = $this->$field;
 
-	/**
-	 * Magic getter to get property values for untyped DTOs
-	 */
-	final public function __get(string $name): mixed
-	{
-		if (static::class != self::class) {
-			throw new RuntimeException(sprintf(
-				'Cannot get field on "%s", undeclared property "%s".',
-				static::class,
-				$name
-			));
+				if ($reset) {
+					$this->_values[$field] = $this->$field;
+				}
+			}
 		}
 
-		return $this->_values[$name] ?? NULL;
-	}
-
-
-	/**
-	 * Magic setter to set property values for untyped DTOs
-	 */
-	final public function __set(string $name, mixed $value): void
-	{
-		if (static::class != self::class) {
-			throw new RuntimeException(sprintf(
-				'Cannot get field on "%s", undeclared property "%s".',
-				static::class,
-				$name
-			));
-		}
-
-		$this->_values[$name] = $value;
+		return $values;
 	}
 }

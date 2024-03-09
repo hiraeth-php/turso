@@ -22,7 +22,7 @@ class Database
 
 	/**
 	 * A cache of repositories already instantiated
-	 * @var array<Repository>
+	 * @var array<class-string, mixed>
 	 */
 	protected $cache = array();
 
@@ -62,34 +62,11 @@ class Database
 		$this->organization = $organization;
 	}
 
-	/**
-	 * Dies with a RuntimeException if the result is an error with an optional message
-	 */
-	public function dieOnError(Result $result, string $message = NULL): Result
-	{
-		if ($result->isError()) {
-			$error = sprintf(
-				'%s: %s in "%s"',
-				$result->getError()->code,
-				$result->getError()->message,
-				$result->getSQL()
-			);
-
-			if ($message) {
-				$error = $message . '(' . $error . ')';
-			}
-
-			throw new RuntimeException($error);
-		}
-
-		return $result;
-	}
 
 	/**
 	 * Get a repository by its class name
-	 * @template T of Repository
-	 * @param class-string<T> $class
-	 * @return T
+	 * @param class-string $class
+	 * @return Repository
 	 */
 	public function getRepository(string $class): Repository
 	{
@@ -111,8 +88,9 @@ class Database
 	 * Execute a string of SQL (Queries can also be passed as they implement __toString)
 	 * @param array<string, mixed> $params
 	 * @param array<string, mixed> $identifiers
+	 * @return Result<Entity>
 	 */
-	public function execute(string $sql, array $params = array(), array $identifiers = array()): Result
+	public function execute(string $sql, array $params = array(), array $identifiers = array(), bool $type = TRUE): Result
 	{
 		$headers = [ 'Authorization' => 'Bearer ' . $this->token, 'Content-Type' => 'application/json' ];
 		$handle  = fopen('php://memory', 'w');
@@ -137,7 +115,7 @@ class Database
 
 			fclose($handle);
 
-			return new Result($sql, $this, json_decode($response->getBody()->getContents(), TRUE));
+			return new Result($sql, $this, json_decode($response->getBody()->getContents(), TRUE), $type);
 		}
 
 		throw new RuntimeException(sprintf(

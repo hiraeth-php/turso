@@ -13,7 +13,7 @@ abstract class Repository
 {
 	/**
 	 * The entity class for which this repository operates
-	 * @var class-string|null
+	 * @var class-string<T>|null
 	 */
 	const entity = NULL;
 
@@ -110,6 +110,8 @@ abstract class Repository
 
 
 	/**
+	 * Create a new entity instance
+	 * @param array<string, mixed> $values
 	 * @return T
 	 */
 	public function create(array $values = array()): Entity
@@ -140,7 +142,9 @@ abstract class Repository
 
 
 	/**
-	 *
+	 * Delete an entity from the database
+	 * @param T $entity
+	 * @return Result<T>
 	 */
 	public function delete(Entity $entity): Result
 	{
@@ -152,10 +156,10 @@ abstract class Repository
 			$ident[] = $query->expression()->eq($column, $entity->$field);
 		}
 
-		$result = $this->database->execute($query->where(...$ident));
-
 		return $this->database
-			->dieOnError($result, 'Failed removing record')
+			->execute($query->where(...$ident), [], [], FALSE)
+			->throw('Failed deleting entity')
+			->of(static::entity)
 		;
 	}
 
@@ -163,6 +167,7 @@ abstract class Repository
 	/**
 	 * Find a single entity based on its ID or map of unique field = value criteria.
 	 * @param int|string|array<string, mixed> $id
+	 * @return T
 	 */
 	public function find(int|string|array $id): ?Entity
 	{
@@ -193,6 +198,7 @@ abstract class Repository
 	/**
 	 * Find all entities with optional ordering
 	 * @param array<string, string> $order
+	 * @return Result<T>
 	 */
 	public function findAll(array $order = array()): Result
 	{
@@ -204,6 +210,7 @@ abstract class Repository
 	 * Find entities based on simple field = value criteria + optional ordering, limit, and page
 	 * @param array<string, mixed> $criteria
 	 * @param array<string, string> $order
+	 * @return Result<T>
 	 */
 	public function findBy(array $criteria, array $order = array(), int $limit = NULL, int $page = NULL): Result
 	{
@@ -224,7 +231,7 @@ abstract class Repository
 		}
 
 		return $this->select(
-			function(Selectquery $query) use ($conditions, $sorts, $limit, $page) {
+			function(SelectQuery $query) use ($conditions, $sorts, $limit, $page) {
 				$query
 					->fetch('*')
 					->where(...$conditions)
@@ -238,34 +245,38 @@ abstract class Repository
 
 
 	/**
-	 *
+	 * Insert an entity into the database
+	 * @param Entity<T> $entity
+	 * @return Result<T>
 	 */
 	public function insert(Entity $entity): Result
 	{
 		$query  = new InsertQuery(static::entity::table);
 		$values = array();
 
-		foreach ($entity::_diff($entity, TRUE) as $field => $value) {
+		foreach ($entity->_diff(TRUE) as $field => $value) {
 			$values[$this->mapping[$field]] = $value;
 		}
 
-		$result = $this->database->execute($query->values($values));
+		$result = $this->database
+			->execute($query->values($values), [], [], FALSE)
+			->throw('Failed inserting entity')
+		;
 
 		if (count(static::identity) == 1 && empty($values[static::identity[0]])) {
 			$field          = static::identity[0];
 			$entity->$field = $result->getInsertId();
 
-			$entity::_diff($entity, TRUE);
+			$entity->_diff(TRUE);
 		}
 
-		return $this->database
-			->dieOnError($result, 'Failed inserting record')
-		;
+		return $result->of(static::entity);
 	}
 
 
 	/**
-	 *
+	 * Select entities from the database
+	 * @return Result<T>
 	 */
 	public function select(callable $builder): Result
 	{
@@ -273,27 +284,28 @@ abstract class Repository
 
 		$builder($query->fetch('*'), $query->expression());
 
-		$result = $this->database->execute($query->map(['*' => '*'] + $this->mapping));
-
 		return $this->database
-			->dieOnError($result, 'Failed selecting records')
+			->execute($query->map(['*' => '*'] + $this->mapping), [], [], FALSE)
+			->throw('Failed selecting entities')
 			->of(static::entity)
 		;
 	}
 
 
 	/**
-	 *
-	*/
+	 * Update an entity in the database
+	 * @param Entity<T> $entity
+	 * @return Result<T>
+	 */
 	public function update(Entity $entity): Result
 	{
 		$query  = new UpdateQuery(static::entity::table);
-		$values = $entity::_diff($entity, TRUE);
+		$values = $entity->_diff(TRUE);
 		$ident  = array();
 		$sets   = array();
 
 		if (!$values) {
-			return new Result('NULL', $this->database, []);
+			return new Result('NULL', $this->database, [], static::entity);
 		}
 
 		foreach (static::identity as $field) {
@@ -306,10 +318,10 @@ abstract class Repository
 			$sets[] = $query->expression()->eq($column, $value);
 		}
 
-		$result = $this->database->execute($query->set(...$sets)->where(...$ident));
-
 		return $this->database
-			->dieOnError($result, 'Failed updating record')
+			->execute($query->set(...$sets)->where(...$ident), [], [], FALSE)
+			->throw('Failed updating entity')
+			->of(static::entity)
 		;
 	}
 }
