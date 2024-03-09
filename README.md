@@ -168,13 +168,13 @@ class User extends Hiraeth\Turso\Entity
 {
     const table = 'users';
 
-    protected id;
+    protected $id;
 
-    public firstName;
+    public $firstName;
 
-    public lastName;
+    public $lastName;
 
-    public email;
+    public $email;
 
     public function fullName()
     {
