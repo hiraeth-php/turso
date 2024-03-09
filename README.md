@@ -603,4 +603,4 @@ WHERE email LIKE '%@hiraeth.dev' AND (age >= 30 OR age <= 50)
 
 You can nest as many `any()` and `all()` as you need to to group conditions.  The names are chosen as such because `any()` indicates that _any_ of the grouped expressions must be `TRUE` (hence 'or' equivalence) while `all()` indicates that _all_ of the grouped expression must be TRUE (hence 'and' equivalence).
 
-> NOTE: The `Hiraeth\Turso\Expression` class is under heavy active development.  Not all functions shown may be fully supported (or even written yet).  At the rate I'm going, it'll be done in the next few hours though.
+For a list of all supported operators, see the `src/Expression.php` file in the source.
