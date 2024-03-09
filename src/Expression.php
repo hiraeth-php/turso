@@ -25,7 +25,7 @@ class Expression extends Query
 	/**
 	 * Create a new query fragment in the style: @name @operator {value}
 	 */
-	public function cmp(string $name, mixed $value, string $operator)
+	public function cmp(string $name, mixed $value, string $operator): Query
 	{
 		return $this('@name @operator {value}')
 			->raw('name',     $name, TRUE)
