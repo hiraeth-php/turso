@@ -16,9 +16,9 @@ In Hiraeth you can configure a default database connection by adding the followi
 
 ```ini
 [TURSO]
-	NAME         = <your database name>
-	ORGANIZATION = <your organization name>
-	TOKEN        = <your bearer token>
+    NAME         = <your database name>
+    ORGANIZATION = <your organization name>
+    TOKEN        = <your bearer token>
 ```
 
 > NOTE: A database manager is mind, however, it won't be supported for much longer.  That said, creating a new Database is pretty simple, and writing a little wrapper to configure more than one in Hiraeth should be pretty straightforward.
@@ -75,7 +75,7 @@ By contrast, parametized queries allow you to insert variables in place of token
 
 ```php
 $result = $database->execute(
-	"SELECT * FROM @table WHERE email LIKE {domain}",
+    "SELECT * FROM @table WHERE email LIKE {domain}",
     [
         'domain' => '%@hiraeth.dev'
     ],
@@ -99,7 +99,7 @@ The `$result` in all the examples above will hold an instance of `Hiraeth\Turso\
 ```php
 if ($result->isError()) {
     //
-	// handle the error
+    // handle the error
     //
 }
 ```
@@ -108,7 +108,7 @@ It's also possible to just easily throw `\RuntimeException` with a custom messag
 
 ```php
 $databse->dieOnError(
-	$result,
+    $result,
     'Failed executing the query'
 );
 ```
@@ -124,7 +124,7 @@ foreach ($result as $record) {
     echo sprintf(
         'User with e-mail %s has an ID of %s',
         $record->email,
-    	$record->id
+        $record->id
     );
 }
 ```
@@ -166,6 +166,8 @@ Typed entities are simply custom classes which extend the `Hiraeth\Turso\Entity`
 ```php
 class User extends Hiraeth\Turso\Entity
 {
+    const table = 'users';
+
     protected id;
 
     public firstName;
@@ -201,11 +203,11 @@ Since the method returns the results (just with some internal properties establi
 
 ```php
 foreach ($result->of(User::class) as $user) {
-	echo sprintf(
-		'%s has an e-mail of %s' . PHP_EOL,
-		$user->fullName(),
-		$user->email
-	);
+    echo sprintf(
+        '%s has an e-mail of %s' . PHP_EOL,
+        $user->fullName(),
+        $user->email
+    );
 }
 ```
 
@@ -219,7 +221,7 @@ Typed entities have another benefit.  Namely, they can easily obtain related ent
 public function occupation()
 {
     return $this('occupations')->hasOne(
-    	[
+        [
             'occupation' => 'id'
         ],
         FALSE,
@@ -250,7 +252,7 @@ The second argument to the `hasOne()` method tells the association not to _refre
 public function occupation(bool $refresh = FALSE): ?Occupation
 {
     return $this('occupations')->hasOne(
-    	[
+        [
             'occupation' => 'id'
         ],
         $refresh,
@@ -271,7 +273,7 @@ On the inverse side of our `User` example, we can imagine the following on our `
 public function users(bool $refresh = FALSE): Result
 {
     return $this('users')->hasMany(
-    	[
+        [
             'id' => 'occupation'
         ],
         $refresh,
@@ -284,9 +286,9 @@ Here, the default `$refresh` being false is extra important.  Although you can a
 
 ```php
 if (count($occupation->users())) {
-	foreach ($occupation->users() as $user) {
-		// ...
-	}
+    foreach ($occupation->users() as $user) {
+        // ...
+    }
 }
 ```
 
@@ -299,13 +301,13 @@ The major difference between the previous examples and this one is that we need 
 ```php
 public function friends($bool $refresh = FALSE): Result
 {
-	return $this('users', 'friends')->hasMany(
-		[
-			'id' => 'user', 'friend' => 'id'
-		],
-		$refresh,
-		self::class
-	);
+    return $this('users', 'friends')->hasMany(
+        [
+            'id' => 'user', 'friend' => 'id'
+        ],
+        $refresh,
+        self::class
+    );
 }
 ```
 
@@ -313,9 +315,9 @@ Take note of the second argument when invoking with `$this()`.  The first argume
 
 ```sqlite
 CREATE TABLE friends (
-	user INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
-	friend INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
-	PRIMARY KEY (user, friend)
+    user INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    friend INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    PRIMARY KEY (user, friend)
 );
 ```
 
@@ -337,19 +339,13 @@ public function occupation(bool|Occupation $refresh = FALSE): ?Occupation
     }
 
     return $this('occupations')->hasOne(
-    	[
+        [
             'occupation' => 'id'
         ],
         $refresh,
         Occupation::class
     );
 }
-```
-
-Additionally, table information would then need to move to the entity (currently on Repositories):
-
-```php
-const table = 'users';
 ```
 
 You would then pass the newly associated occupation such as:
@@ -377,16 +373,16 @@ You can create a repository by extending `Hiraeth\Turso\Repository`.  A reposito
 ```php
 class Users extends Hiraeth\Turso\Repository
 {
-    const table = 'users';
-
     const entity = User::class;
+
+    const identity = [
+        'id'
+    ];
 
     const order = [
         'firstName' => 'asc',
         'lastName'  => 'asc'
-    ]
-
-    const identity = ['id'];
+    ];
 }
 ```
 
@@ -422,7 +418,7 @@ We will cover each of these very briefly as they are all pretty straightfoward a
 
 ```php
 $user = $users->create([
-	'firstName' => 'Hiraeth',
+    'firstName' => 'Hiraeth',
     'lastName'  => 'User',
     'email'     => 'info@hiraeth.dev'
 ]);
@@ -476,7 +472,7 @@ Unfortunately, due to the nature of `UPDATE` itself, the fact that Turso did not
 
 ```php
 if (!$result->getAffectedRows()) {
-	//
+    //
     // Handle the user having gone missing
     //
 }
@@ -551,18 +547,18 @@ Alas, not all searches for users are conditioned by simple equalities like x = y
 
 ```php
 use Hiraeth\Turso\SelectQuery;
-use Hiraeth\Turso\Expr;
+use Hiraeth\Turso\Expression;
 
 $entities = $users->select(
-	function(SelectQuery $query, Expr $expr) {
+    function(SelectQuery $query, Expression $is) {
         $query
             ->where(
-        		$expr()->like('email', '%@hiraeth.dev'),
-            	$expr()->gte('age', 30)
-        	)
+                $is->like('email', '%@hiraeth.dev'),
+                $is->gte('age', 30)
+            )
             ->order(
-            	$query->sort('age', 'desc')
-        	)
+                $query->sort('age', 'desc')
+            )
             ->limit(20)
             ->offset(0)
     }
@@ -599,11 +595,11 @@ With that in mind, calling any one of the methods shown above will _replace_ (no
 
 ```php
 where(
-	$expr()->like('email', '%@hiraeth.dev'),
-	$expr()->any(
-		$expr()->gte('age', 30),
-		$expr()->lte('age', 50)
-	)
+    $is->like('email', '%@hiraeth.dev'),
+    $is->any(
+        $is->gte('age', 30),
+        $is->lte('age', 50)
+    )
 );
 ```
 
@@ -615,4 +611,4 @@ WHERE email LIKE '%@hiraeth.dev' AND (age >= 30 OR age <= 50)
 
 You can nest as many `any()` and `all()` as you need to to group conditions.  The names are chosen as such because `any()` indicates that _any_ of the grouped expressions must be `TRUE` (hence 'or' equivalence) while `all()` indicates that _all_ of the grouped expression must be TRUE (hence 'and' equivalence).
 
-> NOTE: The `Hiraeth\Turso\Expr` class is under heavy active development.  Not all functions shown may be fully supported (or even written yet).  At the rate I'm going, it'll be done in the next few hours though.
+> NOTE: The `Hiraeth\Turso\Expression` class is under heavy active development.  Not all functions shown may be fully supported (or even written yet).  At the rate I'm going, it'll be done in the next few hours though.

@@ -10,9 +10,9 @@ abstract class WhereQuery extends Query
 	/**
 	 * Get a new expression query for assignments and conditions
 	 */
-	public function expr(): Expr
+	public function expression(): Expression
 	{
-		return new Expr();
+		return new Expression();
 	}
 
 

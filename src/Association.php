@@ -58,7 +58,7 @@ class Association
 	public function hasMany(array $map, bool $refresh = FALSE, string $class = Entity::class): Result
 	{
 		if ($this->target instanceof Repository && $class == Entity::class) {
-			$class = $this->target->getEntity();
+			$class = $this->target::entity;
 		}
 
 		$key = sha1(sprintf('%s@%s', __FUNCTION__, serialize($map)));
@@ -85,7 +85,7 @@ class Association
 	public function hasOne(array $map, bool $refresh = FALSE, string $class = Entity::class ): ?Entity
 	{
 		if ($this->target instanceof Repository && $class == Entity::class) {
-			$class = $this->target->getEntity();
+			$class = $this->target::entity;
 		}
 
 		$key = sha1(sprintf('%s@%s', __FUNCTION__, serialize($map)));
@@ -112,7 +112,7 @@ class Association
 	protected function getResult(array $map): Result
 	{
 		if ($this->target instanceof Repository) {
-			$target = $this->target->getTable();
+			$target = $this->target::entity::table;
 		} else {
 			$target = $this->target;
 		}

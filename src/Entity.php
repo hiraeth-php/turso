@@ -10,6 +10,12 @@ use RuntimeException;
 class Entity
 {
 	/**
+	 * The name of the SQL table to which this entity maps
+	 * @var string|null
+	 */
+	const table = NULL;
+
+	/**
 	 * A cache for associations
 	 * @var array<string, Association>
 	 */

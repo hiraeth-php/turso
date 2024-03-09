@@ -13,26 +13,21 @@ abstract class Repository
 {
 	/**
 	 * The entity class for which this repository operates
+	 * @var class-string|null
 	 */
-	static protected $entity;
+	const entity = NULL;
 
 	/**
 	 * An array containing the entity's fields which constitute its identity/primary key
 	 * @var array<string>
 	 */
-	static protected $identity = array();
+	const identity = array();
 
 	/**
 	 * An array containing entity field => direction ('asc' or 'desc'), for default ordering
 	 * @var array<string, string>
 	 */
-	static protected $order = array();
-
-	/**
-	 * The name of the SQL table to which this repository maps
-	 * @var string
-	 */
-	static protected $table;
+	const order = array();
 
 	/**
 	 * The database on which this repository operates
@@ -54,21 +49,21 @@ abstract class Repository
 	{
 		$this->database = $database;
 
-		if (!static::$entity) {
+		if (!static::entity) {
 			throw new RuntimeException(sprintf(
 				'Cannot initialize repository "%s", entity class not defined',
 				static::class
 			));
 		}
 
-		if (!static::$identity) {
+		if (!static::identity) {
 			throw new RuntimeException(sprintf(
 				'Cannot initialize repository "%s", you must provide at least one identify field',
 				static::class
 			));
 		}
 
-		if (!static::$table) {
+		if (!static::entity::table) {
 			throw new RuntimeException(sprintf(
 				'Cannot initialize repository "%s", table not defined',
 				static::class
@@ -76,7 +71,7 @@ abstract class Repository
 		}
 
 		$result = $this->database
-			->execute("SELECT * FROM @table LIMIT 1", [], [ 'table' => static::$table ])
+			->execute("SELECT * FROM @table LIMIT 1", [], [ 'table' => static::entity::table ])
 		;
 
 		if ($result->isError()) {
@@ -87,7 +82,7 @@ abstract class Repository
 			));
 		}
 
-		$fields  = static::$entity::_inspect();
+		$fields  = static::entity::_inspect();
 		$columns = array_map(
 			fn($column) => $column['name'],
 			$result->getRaw()['results'][0]['response']['result']['cols']
@@ -104,19 +99,12 @@ abstract class Repository
 			}
 		}
 
-		if ($missing = array_diff(static::$identity, array_keys($this->mapping))) {
+		if ($missing = array_diff(static::identity, array_keys($this->mapping))) {
 			throw new RuntimeException(sprintf(
 				'Cannot initialize repository "%s", no columns could match identify fields: %s',
 				static::class,
 				implode(', ', $missing)
 			));
-		}
-
-		if (!static::$order) {
-			static::$order = array_combine(
-				static::$identity,
-				array_pad([], count(static::$identity), 'asc')
-			);
 		}
 	}
 
@@ -126,7 +114,8 @@ abstract class Repository
 	 */
 	public function create(array $values = array()): Entity
 	{
-		$entity  = new static::$entity();
+		$class   = static::entity;
+		$entity  = new $class();
 		$fields  = $entity::_inspect();
 		$invalid = array_diff(array_keys($values), $fields);
 
@@ -134,7 +123,7 @@ abstract class Repository
 			throw new InvalidArgumentException(sprintf(
 				'Unsupported fields %s when creating entity of type "%s"',
 				implode(', ', $invalid),
-				static::$entity
+				static::entity
 			));
 		}
 
@@ -155,12 +144,12 @@ abstract class Repository
 	 */
 	public function delete(Entity $entity): Result
 	{
-		$query = new DeleteQuery(static::$table);
+		$query = new DeleteQuery(static::entity::table);
 		$ident = array();
 
-		foreach (static::$identity as $field) {
+		foreach (static::identity as $field) {
 			$column  = $this->mapping[$field];
-			$ident[] = $query->expr()->eq($column, $entity->$field);
+			$ident[] = $query->expression()->eq($column, $entity->$field);
 		}
 
 		$result = $this->database->execute($query->where(...$ident));
@@ -178,18 +167,18 @@ abstract class Repository
 	public function find(int|string|array $id): ?Entity
 	{
 		if (!is_array($id)) {
-			if (count(static::$identity) > 1) {
+			if (count(static::identity) > 1) {
 				throw new InvalidArgumentException(sprintf(
 					'Cannot find by scalar id on "%s" with "%s", identity has more than one field.',
-					static::$entity,
+					static::entity,
 					$id
 				));
 			}
 
-			$id = array_combine(static::$identity, [$id]);
+			$id = array_combine(static::identity, [$id]);
 		}
 
-		$result = $this->findBy($id, static::$order, 2);
+		$result = $this->findBy($id, array(), 2);
 
 		if (count($result) > 1) {
 			throw new InvalidArgumentException(sprintf(
@@ -197,7 +186,7 @@ abstract class Repository
 			));
 		}
 
-		return $result->of(static::$entity)->getRecord(0);
+		return $result->of(static::entity)->getRecord(0);
 	}
 
 
@@ -220,14 +209,14 @@ abstract class Repository
 	{
 		$sorts      = array();
 		$conditions = array();
-		$query      = new SelectQuery(static::$table);
+		$query      = new SelectQuery(static::entity::table);
 
 		if (!$order) {
-			$order = static::$order;
+			$order = static::order;
 		}
 
 		foreach ($criteria as $field => $value) {
-			$conditions[] = $query->expr()->eq($field, $value);
+			$conditions[] = $query->expression()->eq($field, $value);
 		}
 
 		foreach ($order as $field => $value) {
@@ -251,27 +240,9 @@ abstract class Repository
 	/**
 	 *
 	 */
-	public function getEntity(): string
-	{
-		return static::$entity;
-	}
-
-
-	/**
-	 *
-	 */
-	public function getTable(): string
-	{
-		return static::$table;
-	}
-
-
-	/**
-	 *
-	 */
 	public function insert(Entity $entity): Result
 	{
-		$query  = new InsertQuery(static::$table);
+		$query  = new InsertQuery(static::entity::table);
 		$values = array();
 
 		foreach ($entity::_diff($entity, TRUE) as $field => $value) {
@@ -280,8 +251,8 @@ abstract class Repository
 
 		$result = $this->database->execute($query->values($values));
 
-		if (count(static::$identity) == 1 && empty($values[static::$identity[0]])) {
-			$field          = static::$identity[0];
+		if (count(static::identity) == 1 && empty($values[static::identity[0]])) {
+			$field          = static::identity[0];
 			$entity->$field = $result->getInsertId();
 
 			$entity::_diff($entity, TRUE);
@@ -298,15 +269,15 @@ abstract class Repository
 	 */
 	public function select(callable $builder): Result
 	{
-		$query = new SelectQuery(static::$table);
+		$query = new SelectQuery(static::entity::table);
 
-		$builder($query->fetch('*'));
+		$builder($query->fetch('*'), $query->expression());
 
 		$result = $this->database->execute($query->map(['*' => '*'] + $this->mapping));
 
 		return $this->database
 			->dieOnError($result, 'Failed selecting records')
-			->of(static::$entity)
+			->of(static::entity)
 		;
 	}
 
@@ -316,7 +287,7 @@ abstract class Repository
 	*/
 	public function update(Entity $entity): Result
 	{
-		$query  = new UpdateQuery(static::$table);
+		$query  = new UpdateQuery(static::entity::table);
 		$values = $entity::_diff($entity, TRUE);
 		$ident  = array();
 		$sets   = array();
@@ -325,14 +296,14 @@ abstract class Repository
 			return new Result('NULL', $this->database, []);
 		}
 
-		foreach (static::$identity as $field) {
+		foreach (static::identity as $field) {
 			$column  = $this->mapping[$field];
-			$ident[] = $query->expr()->eq($column, $entity->$field);
+			$ident[] = $query->expression()->eq($column, $entity->$field);
 		}
 
 		foreach ($values as $field => $value) {
 			$column = $this->mapping[$field];
-			$sets[] = $query->expr()->eq($column, $value);
+			$sets[] = $query->expression()->eq($column, $value);
 		}
 
 		$result = $this->database->execute($query->set(...$sets)->where(...$ident));
