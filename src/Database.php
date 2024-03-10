@@ -93,7 +93,7 @@ class Database
 		$handle  = fopen('php://memory', 'w');
 
 		if ($this->token) {
-			$header['Authorization'] = $this->token;
+			$headers['Authorization'] = $this->token;
 		}
 
 		if ($handle) {
