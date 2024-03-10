@@ -3,6 +3,7 @@
 namespace Hiraeth\Turso;
 
 use InvalidArgumentException;
+use ReflectionClass;
 use RuntimeException;
 
 /**
@@ -274,16 +275,25 @@ abstract class Repository
 
 		foreach (static::identity as $field) {
 			$column     = $this->mapping[$field];
-			$reflection = $this->database->getReflections(static::entity)[$field];
+			$reflection = $this->database->getReflections(static::entity)[$column];
 
 			if (!$reflection->isInitialized($entity)) {
 				continue;
 			}
 
-			$ident[$field] = $query->expression()->eq($column, $original[$field]);
+			if ($original[$field] instanceof Undefined) {
+				$ident[$field] = $query->expression()->eq($column, $reflection->getValue($entity));
+				unset($values[$field]);
+			} else {
+				$ident[$field] = $query->expression()->eq($column, $original[$field]);
+			}
 		}
 
 		if (array_diff(static::identity, array_keys($ident))) {
+			$reflection = new ReflectionClass(static::entity);
+
+			$reflection->getProperty('_values')->setValue($entity, $original);
+
 			throw new InvalidArgumentException(sprintf(
 				'Cannot update entity of type "%s", insufficient identify',
 				static::entity
@@ -291,11 +301,19 @@ abstract class Repository
 		}
 
 		foreach ($values as $field => $value) {
-			$column = $this->mapping[$field];
-			$sets[] = $query('@column = {value}')
-				->raw('column', $column, TRUE)
-				->var('value', $value)
-			;
+			$column     = $this->mapping[$field];
+			$reflection = $this->database->getReflections(static::entity)[$column];
+
+			if (!$reflection->isInitialized($entity)) {
+				continue;
+			}
+
+			if (array_key_exists($field, $values)) {
+				$sets[] = $query('@column = {value}')
+					->raw('column', $column, TRUE)
+					->var('value', $value)
+				;
+			}
 		}
 
 		return $this->database

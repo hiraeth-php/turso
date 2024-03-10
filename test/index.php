@@ -110,19 +110,19 @@ foreach ($records as $user) {
 	echo PHP_EOL . get_class($user) . PHP_EOL;
 	echo PHP_EOL . $user->firstName . PHP_EOL;
 
-	$user->email = 'jwick@gmail.com';
+	$user->age = 47;
 
 	try {
-		$users->update($user);
+		$users->update($user); // This will not work because no ID is set.
 
-		throw new Exception();
+		throw new Exception(); // If an exception was not thrown, we actually error
 
 	} catch (InvalidArgumentException $e) {
-
+		// We want to test that this exception occured, so we catch it
+		// and continue;
 	}
 
-	$user->id    = $jwick->id;
-	$user->email = $jwick->email;
+	$user->id = $jwick->id;  // Now that we've set the ID we should be able to update
 
 	$users->update($user);
 }

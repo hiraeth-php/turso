@@ -50,13 +50,14 @@ class Entity
 		$old_values = $entity->_values;
 
 		foreach ($entity->_database->getReflections($entity::class) as $reflection) {
+			$field = $reflection->getName();
+
 			if (!$reflection->isInitialized($entity)) {
+				$entity->_values[$field] == $entity;
 				continue;
 			}
 
-			$field = $reflection->getName();
-
-			if (!isset($entity->_values[$field]) || $entity->$field != $entity->_values[$field]) {
+			if ($entity->_values[$field] instanceof Undefined || $entity->$field != $entity->_values[$field]) {
 				$values[$field] = $entity->$field;
 
 				if ($reset) {
@@ -86,7 +87,7 @@ class Entity
 		}
 
 		foreach ($fields as $field) {
-			$this->_values[$field] = NULL;
+			$this->_values[$field] = new Undefined();
 
 			if (isset($values[$field])) {
 				$data = $values[$field];
