@@ -41,14 +41,11 @@ abstract class Repository
 	 */
 	protected $mapping = array();
 
-
 	/**
 	 * Create a new repository instance
 	 */
 	final public function __construct(Database $database)
 	{
-		$this->database = $database;
-
 		if (!static::entity) {
 			throw new RuntimeException(sprintf(
 				'Cannot initialize repository "%s", entity class not defined',
@@ -58,54 +55,17 @@ abstract class Repository
 
 		if (!static::identity) {
 			throw new RuntimeException(sprintf(
-				'Cannot initialize repository "%s", you must provide at least one identify field',
+				'Cannot initialize repository "%s", no identity fields specified',
 				static::class
 			));
 		}
 
-		if (!static::entity::table) {
-			throw new RuntimeException(sprintf(
-				'Cannot initialize repository "%s", table not defined',
-				static::class
-			));
-		}
-
-		$result = $this->database
-			->execute("SELECT * FROM @table LIMIT 1", [], ['table' => static::entity::table])
-		;
-
-		if ($result->isError()) {
-			throw new RuntimeException(sprintf(
-				'Cannot initialize repository, %s: %s',
-				$result->getError()->code,
-				$result->getError()->message
-			));
-		}
-
-		$fields  = static::entity::_inspect();
-		$columns = array_map(
-			fn($column) => $column['name'],
-			$result->getRaw()['results'][0]['response']['result']['cols']
+		$reflections    = $database->getReflections(static::entity);
+		$this->database = $database;
+		$this->mapping  = array_combine(
+			array_map(fn($reflection) => $reflection->getName(), $reflections),
+			array_keys($reflections)
 		);
-
-		foreach ($fields as $i => $field) {
-			foreach ($columns as $j => $column) {
-				$field  = preg_replace('/[^a-z0-9]/', '', strtolower($field));
-				$column = preg_replace('/[^a-z0-9]/', '', strtolower($column));
-
-				if ($field == $column) {
-					$this->mapping[$fields[$i]] = $columns[$j];
-				}
-			}
-		}
-
-		if ($missing = array_diff(static::identity, array_keys($this->mapping))) {
-			throw new RuntimeException(sprintf(
-				'Cannot initialize repository "%s", no columns could match identify fields: %s',
-				static::class,
-				implode(', ', $missing)
-			));
-		}
 	}
 
 
@@ -116,28 +76,29 @@ abstract class Repository
 	 */
 	public function create(array $values = array()): Entity
 	{
-		$class   = static::entity;
-		$entity  = new $class();
-		$fields  = $entity::_inspect();
-		$invalid = array_diff(array_keys($values), $fields);
+		$class = static::entity;
+
+		$invalid = array_diff(
+			array_keys($values),
+			array_keys($this->mapping)
+		);
 
 		if ($invalid) {
 			throw new InvalidArgumentException(sprintf(
 				'Unsupported fields %s when creating entity of type "%s"',
 				implode(', ', $invalid),
-				static::entity
+				$class
 			));
 		}
 
-		foreach ($fields as $field) {
-			if (!isset($values[$field])) {
-				continue;
-			}
-
-			$entity->$field = $values[$field];
+		foreach ($values as $field => $value) {
+			$values[$field] = [
+				'type'  => gettype($value),
+				'value' => $value
+			];
 		}
 
-		return $entity;
+		return new $class($this->database, $values);
 	}
 
 
@@ -254,7 +215,7 @@ abstract class Repository
 		$query  = new InsertQuery(static::entity::table);
 		$values = array();
 
-		foreach ($entity->_diff(TRUE) as $field => $value) {
+		foreach (static::entity::_diff($entity, TRUE) as $field => $value) {
 			$values[$this->mapping[$field]] = $value;
 		}
 
@@ -264,10 +225,12 @@ abstract class Repository
 		;
 
 		if (count(static::identity) == 1 && empty($values[static::identity[0]])) {
-			$field          = static::identity[0];
-			$entity->$field = $result->getInsertId();
+			$identity    = static::identity[0];
+			$reflections = $this->database->getReflections(static::entity);
 
-			$entity->_diff(TRUE);
+			$reflections[$identity]->setValue($entity, $result->getInsertId());
+
+			static::entity::_diff($entity, TRUE);
 		}
 
 		return $result->of(static::entity);
@@ -300,7 +263,7 @@ abstract class Repository
 	public function update(Entity $entity): Result
 	{
 		$query  = new UpdateQuery(static::entity::table);
-		$values = $entity->_diff(TRUE);
+		$values = static::entity::_diff($entity, TRUE);
 		$ident  = array();
 		$sets   = array();
 
@@ -315,7 +278,10 @@ abstract class Repository
 
 		foreach ($values as $field => $value) {
 			$column = $this->mapping[$field];
-			$sets[] = $query->expression()->eq($column, $value);
+			$sets[] = $query('@column = {value}')
+				->raw('column', $column, TRUE)
+				->var('value', $value)
+			;
 		}
 
 		return $this->database

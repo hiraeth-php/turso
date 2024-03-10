@@ -117,7 +117,7 @@ class Query
 			}
 
 			foreach ($matches as $i => $token) {
-				if (!isset($this->vars[$symbols[$i]])) {
+				if (!array_key_exists($symbols[$i], $this->vars)) {
 					throw new RuntimeException(sprintf(
 						'Cannot compile query, %s used in template, but no matching variable set',
 						$token

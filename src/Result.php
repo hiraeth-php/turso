@@ -44,7 +44,7 @@ class Result implements Countable, Iterator
 	protected $entity;
 
 	/**
-	 * The cached mapping of columns to entity fields when entity is set using of()
+	 * The cached mapping of columns to entity fields
 	 * @var array<string, string>
 	 */
 	protected $mapping = array();
@@ -68,13 +68,8 @@ class Result implements Countable, Iterator
 		$this->content  = $content;
 
 		if ($class === TRUE || $class == Entity::class) {
-			$columns = array_map(
-				fn($col) => $col['name'],
-				$content['results'][0]['response']['result']['cols'] ?? []
-			);
-
 			$this->entity  = Entity::class;
-			$this->mapping = array_combine($columns, $columns);
+			$this->mapping = array_combine($this->getColumns(), $this->getColumns());
 		}
 	}
 
@@ -116,6 +111,20 @@ class Result implements Countable, Iterator
 
 		return $this->content['results'][0]['response']['result']['affected_row_count']
 			?? 0;
+	}
+
+
+	/**
+	 * Get the column names returned with the result
+	 * @return array<string>
+	 */
+	public function getColumns(): array
+	{
+		return array_map(
+			fn($column) => $column['name'],
+			$this->content['results'][0]['response']['result']['cols']
+			?? []
+		);
 	}
 
 
@@ -163,12 +172,13 @@ class Result implements Countable, Iterator
 
 		if ($data) {
 			if (!isset($this->cache[$index])) {
-				$this->cache[$index] = $this->entity::_create(
+				$this->cache[$index] = new $this->entity(
 					$this->database,
 					array_combine(
-						$this->mapping,
+						array_intersect_key($this->mapping, array_flip($this->getColumns())),
 						$data
-					)
+					),
+					TRUE
 				);
 			}
 
@@ -260,35 +270,14 @@ class Result implements Countable, Iterator
 			));
 		}
 
-		$mapping = array();
-		$fields  = $class::_inspect();
-		$columns = array_map(
-			fn($col) => $col['name'],
-			$this->content['results'][0]['response']['result']['cols'] ?? []
-		);
-
-		foreach ($columns as $i => $column) {
-			foreach ($fields as $j => $field) {
-				$column = preg_replace('/[^a-z0-9]/', '', strtolower($column));
-				$field  = preg_replace('/[^a-z0-9]/', '', strtolower($field));
-
-				if ($column == $field) {
-					$mapping[(string) $columns[$i]] = $fields[$j];
-				}
-			}
-		}
-
-		if (count($mapping) != count($columns)) {
-			throw new RuntimeException(sprintf(
-				'Missing properties %s, when trying to cast result as "%s"',
-				implode(', ', array_diff($columns, array_keys($this->mapping))),
-				$class
-			));
-		}
+		$reflections = $this->database->getReflections($class);
 
 		$this->cache   = array();
-		$this->mapping = $mapping;
 		$this->entity  = $class;
+		$this->mapping = array_combine(
+			array_keys($reflections),
+			array_map(fn($reflection) => $reflection->getName(), $reflections)
+		);
 
 		return $this;
 	}

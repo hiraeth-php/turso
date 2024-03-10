@@ -41,10 +41,13 @@ class Expression extends Query
 	public function eq(string $name, mixed $value): Query
 	{
 		if (is_null($value)) {
-			return $this->cmp($name, '', 'IS NULL');
-		} else {
-			return $this->cmp($name, $value, '=');
+			return $this('@name IS NULL')
+				->raw('name', $name, TRUE)
+			;
+
 		}
+
+		return $this->cmp($name, $value, '=');
 	}
 
 
@@ -108,13 +111,16 @@ class Expression extends Query
 	public function neq(string $name, mixed $value): Query
 	{
 		if (is_null($value)) {
-			return $this->cmp($name, '', 'IS NOT NULL');
-		} else {
-			return $this('(@name <> {value} OR @name IS NULL)')
-				->raw('name',  $name, TRUE)
-				->var('value', $value)
+			return $this('@name IS NOT NULL')
+				->raw('name', $name, TRUE)
 			;
+
 		}
+
+		return $this('(@name <> {value} OR @name IS NULL)')
+			->raw('name',  $name, TRUE)
+			->var('value', $value)
+		;
 	}
 
 

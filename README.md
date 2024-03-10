@@ -16,11 +16,16 @@ If you want to test and play around with this, follow these instructions:
 
 1. Clone this repository: `git clone https://github.com/hiraeth-php/turso.git`
 2. Change directory: `cd turso`
-3. On Linux (only?): `chmod 666:666 test/data/sqld`
-4. Run in docker: `docker compose up -d`
-5. Execute: `php test/index.php`
+3. Compose: `composer install`
+4. On Linux (only?): `chmod 666:666 test/data/sqld`
+5. Run in docker: `docker compose up -d`
+6. Execute: `php test/index.php`
 
 > NOTE: Step #3 above seems to be necessary for some permission issues with docker on Linux.  Basically, internally the LibSQL server docker image creates and `sqld` user/group (with id 666).  The folder it writes to needs to have this uid and gid for the database to initialize properly and write.
+
+### Modifying Tests
+
+If you want to create your own tables and add corresponding entities and repositories, **BE ADVISED** that the package is class-map autoloaded.  So long as you're running the tests from the cloned repo (with the library as the root package) it will autoload everything from `test/src`, so you can just add your classes in there, **HOWEVER**, you will need to run `composer dump` to have them recognized.
 
 ## Basic Usage
 
