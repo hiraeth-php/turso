@@ -97,7 +97,7 @@ class Database
 	 */
 	public function execute(string $sql, array $params = array(), array $identifiers = array(), bool $type = TRUE): Result
 	{
-		$headers = [ 'Authorization' => 'Bearer ' . $this->token, 'Content-Type' => 'application/json' ];
+		$headers = [ 'Authorization' => $this->token, 'Content-Type' => 'application/json' ];
 		$handle  = fopen('php://memory', 'w');
 
 		if ($handle) {

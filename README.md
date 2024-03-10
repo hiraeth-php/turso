@@ -38,7 +38,7 @@ $database = new Hiraeth\Turso\Database(
 );
 ```
 
-> NOTE: This is not written to PSR-18 standard, or at least no check was done to ensure it wasn't using Guzzle specific implementation.  So for now guzzle is a hard dependency, but the first arg will probably change to any PSR-18 implementation at a later date.
+> NOTE: The $token must container the full Authorization string, such as "Bearer <actual token>"
 
 ## Executing Queries
 
@@ -258,7 +258,7 @@ public function occupation(bool $refresh = FALSE): ?Occupation
 
 In the event of a *-to-one association, the returned value will always be either the corresponding entity type or `NULL` if the person does not have an associated record.
 
-Now that we have a basic idea, let's move on to the others, which will look very similar. 
+Now that we have a basic idea, let's move on to the others, which will look very similar.
 
 #### One-to-Many
 
