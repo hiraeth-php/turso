@@ -93,14 +93,38 @@ foreach ($users->findAll() as $user) {
 }
 
 //
+// Update ID
+//
+
+$jwick->id = 0;
+
+$users->update($jwick);
+
+//
 // Raw execute with casting (partial fields)
 //
 
-$users = $database->execute("SELECT first_name, last_name FROM users")->of(User::class);
+$records = $database->execute("SELECT first_name, last_name FROM users")->of(User::class);
 
-foreach ($users as $user) {
+foreach ($records as $user) {
 	echo PHP_EOL . get_class($user) . PHP_EOL;
 	echo PHP_EOL . $user->firstName . PHP_EOL;
+
+	$user->email = 'jwick@gmail.com';
+
+	try {
+		$users->update($user);
+
+		throw new Exception();
+
+	} catch (InvalidArgumentException $e) {
+
+	}
+
+	$user->id    = $jwick->id;
+	$user->email = $jwick->email;
+
+	$users->update($user);
 }
 
 //
@@ -110,5 +134,5 @@ foreach ($users as $user) {
 $records = $database->execute("SELECT first_name, last_name FROM users");
 
 foreach ($records as $record) {
-	echo $record->first_name . PHP_EOL;
+	echo PHP_EOL . $record->first_name . PHP_EOL;
 }

@@ -262,18 +262,32 @@ abstract class Repository
 	 */
 	public function update(Entity $entity): Result
 	{
-		$query  = new UpdateQuery(static::entity::table);
-		$values = static::entity::_diff($entity, TRUE);
-		$ident  = array();
-		$sets   = array();
+		$sets     = array();
+		$ident    = array();
+		$original = array();
+		$values   = static::entity::_diff($entity, TRUE, $original);
+		$query    = new UpdateQuery(static::entity::table);
 
 		if (!$values) {
 			return new Result('NULL', $this->database, [], static::entity);
 		}
 
 		foreach (static::identity as $field) {
-			$column  = $this->mapping[$field];
-			$ident[] = $query->expression()->eq($column, $entity->$field);
+			$column     = $this->mapping[$field];
+			$reflection = $this->database->getReflections(static::entity)[$field];
+
+			if (!$reflection->isInitialized($entity)) {
+				continue;
+			}
+
+			$ident[$field] = $query->expression()->eq($column, $original[$field]);
+		}
+
+		if (array_diff(static::identity, array_keys($ident))) {
+			throw new InvalidArgumentException(sprintf(
+				'Cannot update entity of type "%s", insufficient identify',
+				static::entity
+			));
 		}
 
 		foreach ($values as $field => $value) {

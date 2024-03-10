@@ -40,13 +40,14 @@ class Entity
 	 * Return the difference between original values and current property values
 	 * @return array<string, mixed>
 	 */
-	static final public function _diff(self $entity, bool $reset = FALSE): array
+	static final public function _diff(self $entity, bool $reset = FALSE, &$old_values = array()): array
 	{
 		if ($entity::class == Entity::class) {
 			return $entity->_values;
 		}
 
-		$values = array();
+		$values     = array();
+		$old_values = $entity->_values;
 
 		foreach ($entity->_database->getReflections($entity::class) as $reflection) {
 			if (!$reflection->isInitialized($entity)) {
