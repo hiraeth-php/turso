@@ -1,0 +1,15 @@
+version: "3"
+services:
+  db:
+    image: ghcr.io/tursodatabase/libsql-server:latest
+    platform: linux/amd64
+    container_name: hiraeth-sqld
+    restart: no
+    ports:
+      - "8090:8080"
+      - "5090:5001"
+    volumes:
+      - ./test/data/sqld:/var/lib/sqld
+    environment:
+      - SQLD_NODE=primary
+      - SQLD_HTTP_AUTH=basic:YWRtaW46YWRtaW4=

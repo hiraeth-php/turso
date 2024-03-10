@@ -30,7 +30,7 @@ For non-integrated use or outside of Hiraeth, or to instantiate multiple databas
 
 ```php
 $database = new Hiraeth\Turso\Database(
-    new Guzzle\Http\Client(),
+    new GuzzleHttp\Client(),
     $url,
     $token
 );
