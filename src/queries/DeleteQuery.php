@@ -10,9 +10,9 @@ class DeleteQuery extends WhereQuery
 	/**
 	 * Create a new instance
 	 */
-	public function __construct(string $table)
+	public function __construct(Database $db, string $table)
 	{
-		parent::__construct('DELETE FROM @table @where');
+		parent::__construct($db, 'DELETE FROM @table @where');
 
 		$this->raw('table', $table);
 	}

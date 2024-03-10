@@ -12,7 +12,7 @@ abstract class WhereQuery extends Query
 	 */
 	public function expression(): Expression
 	{
-		return new Expression();
+		return new Expression($this->db);
 	}
 
 

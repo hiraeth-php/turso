@@ -10,9 +10,9 @@ class UpdateQuery extends WhereQuery
 	/**
 	 * Create a new instance
 	 */
-	public function __construct(string $table)
+	public function __construct(Database $db, string $table)
 	{
-		parent::__construct('UPDATE @table SET @assignments @where');
+		parent::__construct($db, 'UPDATE @table SET @assignments @where');
 
 		$this->raw('table', $table);
 	}

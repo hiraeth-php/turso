@@ -18,6 +18,12 @@ class Query
 	protected $bind = ', ';
 
 	/**
+	 * The database to which this query belongs
+	 * @var Database
+	 */
+	protected $db;
+
+	/**
 	 * A list of raws which have been identified as name values for possible translation
 	 * @var array<string>
 	 */
@@ -53,8 +59,9 @@ class Query
 	 * @param array<string, mixed> $vars
 	 * @param array<string, string> $raws
 	 */
-	public function __construct(string $sql = '', array $vars = array(), array $raws = array())
+	public function __construct(Database $db, string $sql = '', array $vars = array(), array $raws = array())
 	{
+		$this->db   = $db;
 		$this->tmpl = $sql;
 		$this->vars = $vars;
 		$this->raws = $raws;
@@ -66,7 +73,7 @@ class Query
 	 */
 	public function __invoke(string $sql): self
 	{
-		return new self($sql);
+		return new self($this->db, $sql);
 	}
 
 
@@ -124,7 +131,7 @@ class Query
 					));
 				}
 
-				$value = $this->esc($this->vars[$symbols[$i]]);
+				$value = $this->db->escape($this->vars[$symbols[$i]]);
 
 				if (is_null($value)) {
 					throw new InvalidArgumentException(sprintf(
@@ -151,40 +158,6 @@ class Query
 		$this->wrap = $wrap;
 
 		return $this;
-	}
-
-
-	/**
-	 * Escape a value for the database (the type will be inferred using gettype())
-	 */
-	public function esc(mixed $value): ?string
-	{
-		switch (strtolower(gettype($value))) {
-			case 'integer':
-			case 'double':
-				return (string) $value;
-
-			case 'null':
-				return 'null';
-
-			case 'boolean':
-				return $value ? 'true' : 'false';
-
-			case 'string':
-				return "'" . SQLite3::escapeString($value) . "'";
-
-			case 'array':
-				return
-					"(" . implode(',', array_map(
-						function($value) {
-							return $this->esc($value);
-						},
-						$value
-					)) . ")";
-
-			default:
-				return NULL;
-		}
 	}
 
 

@@ -7,8 +7,9 @@ use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Stream;
 use GuzzleHttp\Psr7\Uri;
 use InvalidArgumentException;
-use ReflectionClass;
 use RuntimeException;
+use ReflectionClass;
+use SQLite3;
 
 /**
  * The Database handles connection, and request/response to Turso server
@@ -69,6 +70,40 @@ class Database
 
 
 	/**
+	 * Escape a value for the database (the type will be inferred using gettype())
+	 */
+	public function escape(mixed $value): ?string
+	{
+		switch (strtolower(gettype($value))) {
+			case 'integer':
+			case 'double':
+				return (string) $value;
+
+			case 'null':
+				return 'NULL';
+
+			case 'boolean':
+				return $value ? 'TRUE' : 'FALSE';
+
+			case 'string':
+				return "'" . SQLite3::escapeString($value) . "'";
+
+			case 'array':
+				return
+					"(" . implode(',', array_map(
+						function($value) {
+							return $this->escape($value);
+						},
+						$value
+					)) . ")";
+
+			default:
+				return NULL;
+		}
+	}
+
+
+	/**
 	 * Execute a string of SQL (Queries can also be passed as they implement __toString)
 	 * @param array<string, mixed> $params
 	 * @param array<string, mixed> $identifiers
@@ -84,7 +119,7 @@ class Database
 		}
 
 		if ($handle) {
-			$query   = new Query($sql, $params, $identifiers);
+			$query   = new Query($this, $sql, $params, $identifiers);
 			$stream  = new Stream($handle);
 			$url     = new Uri($this->url . static::PATH_PIPELINE);
 

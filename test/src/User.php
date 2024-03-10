@@ -1,14 +1,24 @@
 <?php
 
+use Hiraeth\Turso\Types;
+
+/**
+ *
+ */
 class User extends Hiraeth\Turso\Entity
 {
 	const table = 'users';
+
+	const types = [
+		'died' => Types\Date::class
+	];
 
 	protected int $id;
 	protected string|null $firstName;
 	protected string|null $lastName;
 	protected string $email;
 	protected int|null $age;
+	protected DateTime|null $died;
 
 	/**
 	 * Make properties publicly readable.

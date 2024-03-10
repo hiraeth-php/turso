@@ -10,48 +10,56 @@ $database = new Hiraeth\Turso\Database(
 
 $database->debug = TRUE;
 
+$database
+	->execute("DROP TABLE IF EXISTS users")
+	->throw()
+;
+
 //
 // Create our users table if it doesn't exist
 //
 
-$database->execute("
-	CREATE TABLE IF NOT EXISTS users (
-		id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-		first_name TEXT,
-		last_name TEXT,
-		email TEXT NOT NULL UNIQUE,
-		age INTEGER
-	)
-")->throw();
-
-//
-// Clear it out for testing
-//
-
-$database->execute("DELETE FROM users")->throw();
+$database
+	->execute("
+		CREATE TABLE IF NOT EXISTS users (
+			id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+			first_name TEXT,
+			last_name TEXT,
+			email TEXT NOT NULL UNIQUE,
+			age INTEGER,
+			died TEXT
+		)
+	")->throw()
+;
 
 //
 // Insert a couple records using the repository
 //
 
 $users = $database->getRepository(Users::class);
-$users->insert(
-	$jwick = $users->create([
-		'firstName' => 'John',
-		'lastName'  => 'Wick',
-		'email'     => 'babayaga@hotmail.com',
-		'age'       => 44
-	])
-);
 
-$users->insert(
-	$mouse = $users->create([
-		'firstName' => 'Mickey',
-		'lastName'  => 'Mouse',
-		'email'     => 'mm@disney.com',
-		'age'       => 94
-	])
-);
+$users
+	->insert(
+		$jwick = $users->create([
+			'firstName' => 'John',
+			'lastName'  => 'Wick',
+			'email'     => 'babayaga@hotmail.com',
+			'age'       => 44,
+			'died'      => '2023-03-24'
+		])
+	)
+;
+
+$users
+	->insert(
+		$mouse = $users->create([
+			'firstName' => 'Mickey',
+			'lastName'  => 'Mouse',
+			'email'     => 'mm@disney.com',
+			'age'       => 94
+		])
+	)->throw()
+;
 
 //
 // Ensure IDs get assigned
@@ -66,20 +74,20 @@ echo $mouse->id . PHP_EOL;
 
 $jwick->age = 45;
 
-$users->update($jwick);
+$users->update($jwick)->throw();
 
 //
 // Null Mouse's name
 //
 $mouse->firstName = NULL;
 
-$users->update($mouse);
+$users->update($mouse)->throw();
 
 //
 // Delete Mouse
 //
 
-$users->delete($mouse);
+$users->delete($mouse)->throw();
 
 //
 // Test findAll(), should only be Wick
@@ -87,9 +95,9 @@ $users->delete($mouse);
 foreach ($users->findAll() as $user) {
 	$user->age = 46;
 
-	echo PHP_EOL . get_class($user) . PHP_EOL;
+	echo PHP_EOL . $user->died->format('m/d/y') . PHP_EOL;
 
-	$users->update($user);
+	$users->update($user)->throw();
 }
 
 //
@@ -98,7 +106,7 @@ foreach ($users->findAll() as $user) {
 
 $jwick->id = 0;
 
-$users->update($jwick);
+$users->update($jwick)->throw();
 
 //
 // Raw execute with casting (partial fields)
@@ -110,11 +118,12 @@ foreach ($records as $user) {
 	echo PHP_EOL . get_class($user) . PHP_EOL;
 	echo PHP_EOL . $user->firstName . PHP_EOL;
 
-	$user->age = 47;
+	$user->age  = 47;
+	$user->died = NULL;
 
 	try {
 		// This will not work because no ID is set.
-		$users->update($user);
+		$users->update($user)->throw();
 
 		// If an exception was not thrown, we actually error
 		throw new Exception('Failed trying to update entity without id');
@@ -126,7 +135,7 @@ foreach ($records as $user) {
 
 	$user->id = $jwick->id;  // Now that we've set the ID we should be able to update
 
-	$users->update($user);
+	$users->update($user)->throw();
 }
 
 //
@@ -139,7 +148,7 @@ foreach ($records as $record) {
 	echo PHP_EOL . $record->first_name . PHP_EOL;
 
 	try {
-		$users->insert($record);
+		$users->insert($record)->throw();
 
 		throw new Exception('Failed trying to handle foreign entity');
 	} catch (InvalidArgumentException $e) {
@@ -150,6 +159,6 @@ foreach ($records as $record) {
 //
 // Select with count
 //
-$users->select(function() {}, $total);
+$users->select(function() {}, $total)->throw();
 
 echo PHP_EOL . $total . PHP_EOL;

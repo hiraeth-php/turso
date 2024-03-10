@@ -9,9 +9,9 @@ class SelectQuery extends WhereQuery
 	/**
 	 *
 	 */
-	public function __construct(string $table)
+	public function __construct(Database $db, string $table)
 	{
-		parent::__construct('SELECT @names FROM @table @where @order @limit @offset');
+		parent::__construct($db, 'SELECT @names FROM @table @where @order @limit @offset');
 
 		$this->raw('table', $table);
 	}

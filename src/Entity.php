@@ -19,6 +19,11 @@ class Entity
 	const table = NULL;
 
 	/**
+	 * @var array<string, class-string>
+	*/
+	const types = [];
+
+	/**
 	 * The value store for untyped DTOs
      * @var array<string, mixed>
 	 */
@@ -38,9 +43,10 @@ class Entity
 
 	/**
 	 * Return the difference between original values and current property values
+	 * @param T $entity
 	 * @return array<string, mixed>
 	 */
-	static final public function _diff(self $entity, bool $reset = FALSE, &$old_values = array()): array
+	static final public function _diff(Entity $entity, bool $reset = FALSE, &$old_values = array()): array
 	{
 		if ($entity::class == Entity::class) {
 			return $entity->_values;
@@ -92,31 +98,37 @@ class Entity
 			if (isset($values[$field])) {
 				$data = $values[$field];
 
-				switch (strtolower($data['type'])) {
-					case 'null':
-						$value = NULL; break;
+				if (isset(static::types[$field])) {
+					$type  = static::types[$field];
+					$value = $type::from($data['value']);
 
-					case 'integer':
-						$value = intval($data['value']); break;
+				} else {
+					switch (strtolower($data['type'])) {
+						case 'null':
+							$value = NULL; break;
 
-					case 'double':
-					case 'real':
-						$value = floatval($data['value']); break;
+						case 'integer':
+							$value = intval($data['value']); break;
 
-					case 'boolean':
-						$value = boolval($data['value']); break;
+						case 'double':
+						case 'real':
+							$value = floatval($data['value']); break;
 
-					case 'string':
-					case 'text':
-					case 'blob':
-						$value = $data['value']; break;
+						case 'boolean':
+							$value = boolval($data['value']); break;
 
-					default:
-						throw new RuntimeException(sprintf(
-							'Cannot assign type "%s" for field "%s", unknown type.',
-							$data['type'],
-							$field
-						));
+						case 'string':
+						case 'text':
+						case 'blob':
+							$value = $data['value']; break;
+
+						default:
+							throw new RuntimeException(sprintf(
+								'Cannot assign type "%s" for field "%s", unknown type.',
+								$data['type'],
+								$field
+							));
+					}
 				}
 
 				if ($init) {

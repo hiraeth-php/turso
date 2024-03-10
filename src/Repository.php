@@ -110,7 +110,7 @@ abstract class Repository
 	 */
 	public function delete(Entity $entity): Result
 	{
-		$query = new DeleteQuery(static::entity::table);
+		$query = new DeleteQuery($this->database, static::entity::table);
 		$ident = array();
 
 		$this->handle($entity, __FUNCTION__);
@@ -180,7 +180,7 @@ abstract class Repository
 	{
 		$sorts      = array();
 		$conditions = array();
-		$query      = new SelectQuery(static::entity::table);
+		$query      = new SelectQuery($this->database, static::entity::table);
 
 		if (!$order) {
 			$order = static::order;
@@ -215,12 +215,17 @@ abstract class Repository
 	 */
 	public function insert(Entity $entity): Result
 	{
-		$query  = new InsertQuery(static::entity::table);
+		$query  = new InsertQuery($this->database, static::entity::table);
 		$values = array();
 
 		$this->handle($entity, __FUNCTION__);
 
 		foreach (static::entity::_diff($entity, TRUE) as $field => $value) {
+			if (isset(static::entity::types[$field])) {
+				$type  = static::entity::types[$field];
+				$value = $type::to($value);
+			}
+
 			$values[$this->mapping[$field]] = $value;
 		}
 
@@ -248,7 +253,7 @@ abstract class Repository
 	 */
 	public function select(callable $builder, int &$total = NULL): Result
 	{
-		$query = new SelectQuery(static::entity::table);
+		$query = new SelectQuery($this->database, static::entity::table);
 
 		$builder($query->fetch('*'), $query->expression());
 
@@ -281,7 +286,7 @@ abstract class Repository
 		$ident    = array();
 		$original = array();
 		$values   = static::entity::_diff($entity, TRUE, $original);
-		$query    = new UpdateQuery(static::entity::table);
+		$query    = new UpdateQuery($this->database, static::entity::table);
 
 		$this->handle($entity, __FUNCTION__);
 
@@ -298,11 +303,18 @@ abstract class Repository
 			}
 
 			if ($original[$field] instanceof Undefined) {
-				$ident[$field] = $query->expression()->eq($column, $reflection->getValue($entity));
+				$value = $reflection->getValue($entity);
 				unset($values[$field]);
 			} else {
-				$ident[$field] = $query->expression()->eq($column, $original[$field]);
+				$value = $original[$field];
 			}
+
+			if (isset(static::entity::types[$field])) {
+				$type  = static::entity::types[$field];
+				$value = $type::to($value);
+			}
+
+			$ident[$field] = $query->expression()->eq($column, $value);
 		}
 
 		if (array_diff(static::identity, array_keys($ident))) {
@@ -325,6 +337,11 @@ abstract class Repository
 			}
 
 			if (array_key_exists($field, $values)) {
+				if (isset(static::entity::types[$field])) {
+					$type = static::entity::types[$field];
+					$value = $type::to($value);
+				}
+
 				$sets[] = $query('@column = {value}')
 					->raw('column', $column, TRUE)
 					->var('value', $value)
