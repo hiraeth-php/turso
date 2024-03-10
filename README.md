@@ -16,9 +16,8 @@ In Hiraeth you can configure a default database connection by adding the followi
 
 ```ini
 [TURSO]
-    NAME         = <your database name>
-    ORGANIZATION = <your organization name>
-    TOKEN        = <your bearer token>
+    URL   = <your database url without trailing />
+    TOKEN = Bearer <your bearer token>
 ```
 
 > NOTE: A database manager is mind, however, it won't be supported for much longer.  That said, creating a new Database is pretty simple, and writing a little wrapper to configure more than one in Hiraeth should be pretty straightforward.
@@ -32,9 +31,8 @@ For non-integrated use or outside of Hiraeth, or to instantiate multiple databas
 ```php
 $database = new Hiraeth\Turso\Database(
     new Guzzle\Http\Client(),
-    $name,
-    $token,
-    $organization
+    $url,
+    $token
 );
 ```
 
