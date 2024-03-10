@@ -33,8 +33,8 @@ In Hiraeth you can configure a default database connection by adding the followi
 
 ```ini
 [TURSO]
-    URL   = <your database url without trailing />
-    TOKEN = Bearer <your bearer token>
+    URL   = https://<dbname>-<organization>.turso.io
+    TOKEN = Bearer <token>
 ```
 
 > NOTE: A database manager is mind, however, it won't be supported for much longer.  That said, creating a new Database is pretty simple, and writing a little wrapper to configure more than one in Hiraeth should be pretty straightforward.
@@ -48,19 +48,19 @@ For non-integrated use or outside of Hiraeth, or to instantiate multiple databas
 ```php
 $database = new Hiraeth\Turso\Database(
     new GuzzleHttp\Client(),
-    $url,
-    $token
+    'https://<dbname>-<organization>.turso.io',
+    'Bearer <token>'
 );
 ```
 
-> NOTE: The $token must container the full Authorization string, such as "Bearer <actual token>"
+> NOTE: You can run against a local LibSQL SQLD server (as is done for Testing) by replacing the URL and generally using a `Basic` auth token in place of a `Bearer`.
 
 ## Executing Queries
 
 There are two main types of queries you can run:
 
 - Static Queries
-- Parametized Queries
+- Parameterized Queries
 
 The two styles **SHOULD NOT** be mixed.  You have been warned.
 
@@ -84,9 +84,9 @@ $result = $database->execute(
 
 A query is determined to be static when no additional arguments are passed to the `Database::execute()` function.
 
-### Parametized Queries
+### Parameterized Queries
 
-By contrast, parametized queries allow you to insert variables in place of tokens.  An example of the above query rewritten as a parametized query would be as follows:
+By contrast, parameterized queries allow you to insert variables in place of tokens.  An example of the above query rewritten as a parameterized query would be as follows:
 
 ```php
 $result = $database->execute(
@@ -100,7 +100,7 @@ $result = $database->execute(
 );
 ```
 
-There are two types of parameters which can be placed into parametized queries:
+There are two types of parameters which can be placed into parameterized queries:
 
 - Escapable Variables
 - Raw Values

@@ -196,7 +196,15 @@ class Query
 	{
 		$map = function($name) use ($mapping) {
 			if (!isset($mapping[$name])) {
-				// throw
+				$match = array();
+				if ($name == '*' || preg_match('/[a-z_]+\(([^\)]+)\)/i', $name, $match)) {
+					return $name;
+				}
+
+				throw new InvalidArgumentException(sprintf(
+					'No mapping available for column "%s"',
+					$name
+				));
 			}
 
 			return $mapping[$name];

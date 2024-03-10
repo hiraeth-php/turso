@@ -147,3 +147,9 @@ foreach ($records as $record) {
 	}
 }
 
+//
+// Select with count
+//
+$users->select(function() {}, $total);
+
+echo PHP_EOL . $total . PHP_EOL;

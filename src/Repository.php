@@ -246,17 +246,27 @@ abstract class Repository
 	 * Select entities from the database
 	 * @return Result<T>
 	 */
-	public function select(callable $builder): Result
+	public function select(callable $builder, int &$total = NULL): Result
 	{
 		$query = new SelectQuery(static::entity::table);
 
 		$builder($query->fetch('*'), $query->expression());
 
-		return $this->database
-			->execute($query->map(['*' => '*'] + $this->mapping), [], [], FALSE)
+		$result = $this->database
+			->execute($query->map($this->mapping), [], [], FALSE)
 			->throw('Failed selecting entities')
 			->of(static::entity)
 		;
+
+		if (func_num_args() == 2) {
+			$result = $this->database->execute(
+				$query->fetch('COUNT(*) as total')->limit(NULL)->offset(NULL)
+			);
+
+			$total = $result->getRecord(0)->total;
+		}
+
+		return $result;
 	}
 
 
