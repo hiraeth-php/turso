@@ -39,12 +39,6 @@ class Database
 	protected $name;
 
 	/**
-	 * The name of the organization it's under
-	 * @var string
-	 */
-	protected $organization;
-
-	/**
 	 * The bearer token to authorize Turso API requests
 	 * @var string
 	 */
@@ -59,12 +53,11 @@ class Database
 	/**
 	 * Create a new Database instance
 	 */
-	public function __construct(Client $client, string $name, string $token, string $organization)
+	public function __construct(Client $client, string $url, string $token, string = NULL)
 	{
 		$this->client       = $client;
-		$this->name         = $name;
+		$this->url          = $url;
 		$this->token        = $token;
-		$this->organization = $organization;
 	}
 
 
@@ -97,18 +90,17 @@ class Database
 	 */
 	public function execute(string $sql, array $params = array(), array $identifiers = array(), bool $type = TRUE): Result
 	{
-		$headers = [ 'Authorization' => $this->token, 'Content-Type' => 'application/json' ];
+		$headers = [ 'Content-Type' => 'application/json' ];
 		$handle  = fopen('php://memory', 'w');
+
+		if ($this->token) {
+			$header['Authorization'] = $this->token;
+		}
 
 		if ($handle) {
 			$query   = new Query($sql, $params, $identifiers);
 			$stream  = new Stream($handle);
-			$uri     = new Uri(sprintf(
-				'https://%s-%s.turso.io%s',
-				$this->name,
-				$this->organization,
-				static::PATH_PIPELINE
-			));
+			$url     = new Uri($this->url . static::PATH_PIPELINE);
 
 			$stream->write(json_encode([
 				"requests" => [
@@ -117,7 +109,7 @@ class Database
 				]
 			]) ?: '');
 
-			$response = $this->client->sendRequest(new Request('POST', $uri, $headers, $stream));
+			$response = $this->client->sendRequest(new Request('POST', $url, $headers, $stream));
 			$result   = new Result($query, $this, json_decode($response->getBody()->getContents(), TRUE), $type);
 
 			fclose($handle);

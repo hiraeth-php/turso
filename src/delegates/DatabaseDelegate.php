@@ -24,9 +24,8 @@ class DatabaseDelegate implements Delegate
 	{
 		return new Database(
 			$app->get(Client::class),
-			$app->getEnvironment('TURSO_NAME', 'default'),
-			$app->getEnvironment('TURSO_TOKEN'),
-			$app->getEnvironment('TURSO_ORGANIZATION')
+			$app->getEnvironment('TURSO_URL', 'http://localhost:8080'),
+			$app->getEnvironment('TURSO_TOKEN')
 		);
 	}
 }
