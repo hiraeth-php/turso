@@ -113,9 +113,11 @@ foreach ($records as $user) {
 	$user->age = 47;
 
 	try {
-		$users->update($user); // This will not work because no ID is set.
+		// This will not work because no ID is set.
+		$users->update($user);
 
-		throw new Exception(); // If an exception was not thrown, we actually error
+		// If an exception was not thrown, we actually error
+		throw new Exception('Failed trying to update entity without id');
 
 	} catch (InvalidArgumentException $e) {
 		// We want to test that this exception occured, so we catch it
@@ -135,4 +137,13 @@ $records = $database->execute("SELECT first_name, last_name FROM users");
 
 foreach ($records as $record) {
 	echo PHP_EOL . $record->first_name . PHP_EOL;
+
+	try {
+		$users->insert($record);
+
+		throw Exception('Failed trying to handle foreign entity');
+	} catch (InvalidArgumentException $e) {
+
+	}
 }
+

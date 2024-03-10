@@ -113,6 +113,8 @@ abstract class Repository
 		$query = new DeleteQuery(static::entity::table);
 		$ident = array();
 
+		$this->handle($entity, __FUNCTION__);
+
 		foreach (static::identity as $field) {
 			$column  = $this->mapping[$field];
 			$ident[] = $query->expression()->eq($column, $entity->$field);
@@ -216,6 +218,8 @@ abstract class Repository
 		$query  = new InsertQuery(static::entity::table);
 		$values = array();
 
+		$this->handle($entity, __FUNCTION__);
+
 		foreach (static::entity::_diff($entity, TRUE) as $field => $value) {
 			$values[$this->mapping[$field]] = $value;
 		}
@@ -269,6 +273,8 @@ abstract class Repository
 		$values   = static::entity::_diff($entity, TRUE, $original);
 		$query    = new UpdateQuery(static::entity::table);
 
+		$this->handle($entity, __FUNCTION__);
+
 		if (!$values) {
 			return new Result('NULL', $this->database, [], static::entity);
 		}
@@ -321,6 +327,20 @@ abstract class Repository
 			->throw('Failed updating entity')
 			->of(static::entity)
 		;
+	}
+
+	/**
+	 *
+	 */
+	protected function handle(Entity $entity, string $function): void
+	{
+		if ($entity::class != static::entity) {
+			throw new InvalidArgumentException(sprintf(
+				'Entity of type "%s" cannot be handled by "%s"',
+				$entity::class,
+				static::class
+			));
+		}
 	}
 }
 
