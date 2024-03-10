@@ -33,22 +33,21 @@ class Database
 	protected $client;
 
 	/**
-	 * The name of the Turso database to connect to
-	 * @var string
-	 */
-	protected $name;
-
-	/**
-	 * The bearer token to authorize Turso API requests
+	 * The auth token to use (must includear Bearer/Basic/etc)
 	 * @var string
 	 */
 	protected $token;
 
 	/**
+	 * The url of the LibSQL/Turso DB to connect to
+	 * @var string
+	 */
+	protected $url;
+
+	/**
 	 * @var bool
 	 */
 	public $debug = FALSE;
-
 
 	/**
 	 * Create a new Database instance
