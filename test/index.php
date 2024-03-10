@@ -141,7 +141,7 @@ foreach ($records as $record) {
 	try {
 		$users->insert($record);
 
-		throw Exception('Failed trying to handle foreign entity');
+		throw new Exception('Failed trying to handle foreign entity');
 	} catch (InvalidArgumentException $e) {
 
 	}
