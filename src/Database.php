@@ -63,7 +63,7 @@ class Database
 	public function __construct(Client $client, string $url, string $token = NULL)
 	{
 		$this->client = $client;
-		$this->url    = $url;
+		$this->url    = rtrim($url, '/');
 		$this->token  = $token;
 	}
 
