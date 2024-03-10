@@ -53,11 +53,11 @@ class Database
 	/**
 	 * Create a new Database instance
 	 */
-	public function __construct(Client $client, string $url, string $token, string = NULL)
+	public function __construct(Client $client, string $url, string $token = NULL)
 	{
-		$this->client       = $client;
-		$this->url          = $url;
-		$this->token        = $token;
+		$this->client = $client;
+		$this->url    = $url;
+		$this->token  = $token;
 	}
 
 
