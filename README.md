@@ -176,10 +176,16 @@ Records take on the form of object entities, simple DTO (Data Transfer Objects) 
 Typed entities are simply custom classes which extend the `Hiraeth\Turso\Entity` class.  They have a lot of advanced features over default untyped entities.  Here's a simple example of a typed entity, continuing with our user example:
 
 ```php
+use Hiraeth\Turso\Types;
+
 class User extends Hiraeth\Turso\Entity
 {
     const table = 'users';
 
+    const types = [
+        'dateOfBirth' => Types\Date::class
+    ];
+    
     protected $id;
 
     public $firstName;
@@ -187,6 +193,8 @@ class User extends Hiraeth\Turso\Entity
     public $lastName;
 
     public $email;
+    
+    public $dateOfBirth;
 
     public function fullName()
     {
@@ -222,6 +230,52 @@ foreach ($result->of(User::class) as $user) {
     );
 }
 ```
+
+### Custom Data Types
+
+LibSQL (like SQLite) doesn't have rich data types like "date", "time", etc.  This makes sense if you think about how SQL as a language works, dates are sent and received as strings, generally in `YYYY-MM-DD` format.  For this reason, to get and set custom data types, you need to define the types of fields on the entity.  This is done using the `types` const on the entities.  Recall from above:
+
+```php
+const types = [
+    'dateOfBirth' => Types\Date::class
+];
+```
+
+A custom type is a simple class.  Here's the example of the `Hireath\Turso\Types\Date` type:
+
+```php
+namespace Hiraeth\Turso\Types;
+
+use DateTime;
+
+/**
+ * Handles dates
+ */
+class Date {
+	/**
+	 * Convert a value from the database to the entity
+	 */
+	static public function from(string|null $date): DateTime|null
+	{
+		return $date ? new DateTime($date) : NULL;
+	}
+
+
+	/**
+	 * Convert a value from an entity to the database
+	 */
+	static public function to(DateTime|null $date): string|null
+	{
+		return $date ? $date->format('Y-m-d') : NULL;
+	}
+}
+```
+
+You can see there are only two methods to define, `from` and `to`.  The comments should make it pretty clear what each of these does.  Types should basically always support `NULL` in the event that a column is nullable.
+
+This means that when you pull an entity from a users repository or cast it as `User`, the type will be converted accordingly.  Which means in the case of this user, the `dateOfBirth` property on the entity will be either `NULL` or an actual `DateTime` object.  When you insert or update entities using the repository, the `to` method will convert them back to the requisite database value. 
+
+> NOTE: There's no need to escape the value in the type.  The conversion occurs prior to other escaping. 
 
 ### Associations
 
