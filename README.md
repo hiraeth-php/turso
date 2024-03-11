@@ -181,6 +181,10 @@ use Hiraeth\Turso\Types;
 class User extends Hiraeth\Turso\Entity
 {
     const table = 'users';
+    
+    const identity = [
+        'id'
+    ];
 
     const types = [
         'dateOfBirth' => Types\Date::class
@@ -435,10 +439,6 @@ You can create a repository by extending `Hiraeth\Turso\Repository`.  A reposito
 class Users extends Hiraeth\Turso\Repository
 {
     const entity = User::class;
-
-    const identity = [
-        'id'
-    ];
 
     const order = [
         'firstName' => 'asc',

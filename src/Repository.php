@@ -54,7 +54,7 @@ abstract class Repository
 			));
 		}
 
-		if (!static::identity) {
+		if (!static::entity::ident) {
 			throw new RuntimeException(sprintf(
 				'Cannot initialize repository "%s", no identity fields specified',
 				static::class
@@ -115,7 +115,7 @@ abstract class Repository
 
 		$this->handle($entity, __FUNCTION__);
 
-		foreach (static::identity as $field) {
+		foreach (static::entity::ident as $field) {
 			$column  = $this->mapping[$field];
 			$ident[] = $query->expression()->eq($column, $entity->$field);
 		}
@@ -136,7 +136,7 @@ abstract class Repository
 	public function find(int|string|array $id): ?Entity
 	{
 		if (!is_array($id)) {
-			if (count(static::identity) > 1) {
+			if (count(static::entity::ident) > 1) {
 				throw new InvalidArgumentException(sprintf(
 					'Cannot find by scalar id on "%s" with "%s", identity has more than one field.',
 					static::entity,
@@ -144,7 +144,7 @@ abstract class Repository
 				));
 			}
 
-			$id = array_combine(static::identity, [$id]);
+			$id = array_combine(static::entity::ident, [$id]);
 		}
 
 		$result = $this->findBy($id, array(), 2);
@@ -234,8 +234,8 @@ abstract class Repository
 			->throw('Failed inserting entity')
 		;
 
-		if (count(static::identity) == 1 && empty($values[static::identity[0]])) {
-			$identity    = static::identity[0];
+		if (count(static::entity::ident) == 1 && empty($values[static::entity::ident[0]])) {
+			$identity    = static::entity::ident[0];
 			$reflections = $this->database->getReflections(static::entity);
 
 			$reflections[$identity]->setValue($entity, $result->getInsertId());
@@ -294,7 +294,7 @@ abstract class Repository
 			return new Result('NULL', $this->database, [], static::entity);
 		}
 
-		foreach (static::identity as $field) {
+		foreach (static::entity::ident as $field) {
 			$column     = $this->mapping[$field];
 			$reflection = $this->database->getReflections(static::entity)[$column];
 
@@ -317,7 +317,7 @@ abstract class Repository
 			$ident[$field] = $query->expression()->eq($column, $value);
 		}
 
-		if (array_diff(static::identity, array_keys($ident))) {
+		if (array_diff(static::entity::ident, array_keys($ident))) {
 			$reflection = new ReflectionClass(static::entity);
 
 			$reflection->getProperty('_values')->setValue($entity, $original);

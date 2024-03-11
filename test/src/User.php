@@ -9,6 +9,10 @@ class User extends Hiraeth\Turso\Entity
 {
 	const table = 'users';
 
+	const ident = [
+		'id'
+	];
+
 	const types = [
 		'died' => Types\Date::class
 	];
