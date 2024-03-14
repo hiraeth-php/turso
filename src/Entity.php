@@ -1,8 +1,8 @@
 <?php
+declare(strict_types=1);
 
 namespace Hiraeth\Turso;
 
-use InvalidArgumentException;
 use RuntimeException;
 
 
@@ -13,6 +13,11 @@ use RuntimeException;
 class Entity
 {
 	/**
+	 *
+	 */
+	const ident = [];
+
+	/**
 	 * The name of the SQL table to which this entity maps
 	 * @var string|null
 	 */
@@ -20,7 +25,7 @@ class Entity
 
 	/**
 	 * @var array<string, class-string>
-	*/
+	 */
 	const types = [];
 
 	/**
@@ -41,12 +46,13 @@ class Entity
 	 */
 	private $_database;
 
+
 	/**
 	 * Return the difference between original values and current property values
 	 * @param T $entity
 	 * @return array<string, mixed>
 	 */
-	static final public function _diff(Entity $entity, bool $reset = FALSE, &$old_values = array()): array
+	static final public function __diff(Entity $entity, bool $reset = FALSE, &$old_values = array()): array
 	{
 		if ($entity::class == Entity::class) {
 			return $entity->_values;
@@ -73,6 +79,35 @@ class Entity
 		}
 
 		return $values;
+	}
+
+	/**
+	 *
+	 */
+	final static public function __hash(Entity $entity, $old_hash = FALSE): string|null
+	{
+		if ($old_hash) {
+			$values = array_intersect_key($entity->_values, array_flip($entity::ident));
+		} else {
+			$values = array_intersect_key(get_object_vars($entity), array_flip($entity::ident));
+		}
+
+		foreach ($values as $field => $value) {
+			if ($value instanceof Undefined) {
+				unset($value[$field]);
+				continue;
+			}
+
+			if (isset($entity::types[$field])) {
+				$values[$field] = $entity::types[$field]::to($value);
+			}
+		}
+
+		if (count($values) == count($entity::ident)) {
+			return sha1(serialize($values));
+		}
+
+		return NULL;
 	}
 
 
@@ -162,19 +197,46 @@ class Entity
 
 
 	/**
-	 * Magic getter to get property values for untyped DTOs
+	 * Magic getter to get property values for DTOs
 	 */
 	public function __get(string $name): mixed
 	{
-		if (static::class != self::class || !isset($this->_values[$name])) {
-			throw new RuntimeException(sprintf(
-				'Cannot get field on "%s", undeclared property "%s".',
-				static::class,
-				$name
-			));
+		if (static::class != self::class) {
+			$method = '_' . $name;
+
+			if (is_callable([$this, $method])) {
+				return $this->$method();
+			}
+
+			if (array_key_exists($name, $this->_values)) {
+				return $this->$name;
+			}
+		} else {
+			if (array_key_exists($name, $this->_values)) {
+				$value = $this->_values[$name];
+
+				if ($value instanceof Undefined) {
+					return NULL;
+				}
+
+				return $value;
+			}
 		}
 
-		return $this->_values[$name] ?? NULL;
+		throw new RuntimeException(sprintf(
+			'Cannot get field on "%s", inaccessible property "%s".',
+			static::class,
+			$name
+		));
+	}
+
+
+	/**
+	 *
+	 */
+	public function __isset(string $name): bool
+	{
+		return property_exists($this, $name);
 	}
 
 
@@ -183,14 +245,28 @@ class Entity
 	 */
 	public function __set(string $name, mixed $value): void
 	{
-		if (static::class != self::class || !isset($this->_values[$name])) {
-			throw new RuntimeException(sprintf(
-				'Cannot get field on "%s", undeclared property "%s".',
-				static::class,
-				$name
-			));
+		if (static::class != self::class) {
+			$method = '_' . $name;
+
+			if (is_callable([$this, $method])) {
+				$output = $this->$method($value);
+
+				if ($output === $this) {
+					return;
+				}
+			}
+		} else {
+			if (array_key_exists($name, $this->_values)) {
+				$this->_values[$name] = $value;
+
+				return;
+			}
 		}
 
-		$this->_values[$name] = $value;
+		throw new RuntimeException(sprintf(
+			'Cannot set field on "%s", inaccessible property "%s".',
+			static::class,
+			$name
+		));
 	}
 }

@@ -67,9 +67,8 @@ class Result implements Countable, Iterator
 		$this->database = $database;
 		$this->content  = $content;
 
-		if ($class === TRUE || $class == Entity::class) {
-			$this->entity  = Entity::class;
-			$this->mapping = array_combine($this->getColumns(), $this->getColumns());
+		if ($class == Entity::class) {
+			$this->entity = Entity::class;
 		}
 	}
 
@@ -172,13 +171,10 @@ class Result implements Countable, Iterator
 
 		if ($data) {
 			if (!isset($this->cache[$index])) {
-				$this->cache[$index] = new $this->entity(
-					$this->database,
-					array_combine(
-						array_intersect_key($this->mapping, array_flip($this->getColumns())),
-						$data
-					),
-					TRUE
+				$this->cache[$index] = $this->database->getEntity(
+					$this->entity,
+					$this->getColumns(),
+					$data
 				);
 			}
 
@@ -195,6 +191,10 @@ class Result implements Countable, Iterator
 	 */
 	public function getRecords(): array
 	{
+		if (count($this->cache) == count($this)) {
+			return $this->cache;
+		}
+
 		return array_map(
 			fn($index) => $this->getRecord($index),
 			range(0, count($this) - 1)

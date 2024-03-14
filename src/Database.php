@@ -9,6 +9,7 @@ use GuzzleHttp\Psr7\Uri;
 use InvalidArgumentException;
 use RuntimeException;
 use ReflectionClass;
+use ReflectionProperty;
 use SQLite3;
 
 /**
@@ -23,23 +24,26 @@ class Database
 	const PATH_PIPELINE = '/v2/pipeline';
 
 	/**
-	 * A cache of repositories already instantiated
-	 * @var array<class-string, mixed>
-	 */
-	protected $cache = array();
-
-	/**
 	 * The HTTP Client (Guzzle) for sending requests
 	 * @var Client
 	 */
 	protected $client;
 
+	/**
+	 * @var array<string, array<string, mixed>
+	 */
+	protected $entities = array();
 
 	/**
 	 * @var array<class-string, array<\ReflectionProperty>>
 	 */
 	protected $reflections = array();
 
+	/**
+	 * A cache of repositories already instantiated
+	 * @var array<class-string, mixed>
+	 */
+	protected $repositories = array();
 
 	/**
 	 * The auth token to use (must includear Bearer/Basic/etc)
@@ -131,7 +135,8 @@ class Database
 			]) ?: '');
 
 			$response = $this->client->sendRequest(new Request('POST', $url, $headers, $stream));
-			$result   = new Result($query, $this, json_decode($response->getBody()->getContents(), TRUE), $type);
+			$content  = json_decode($response->getBody()->getContents(), TRUE);
+			$result   = new Result($query, $this, $content, $type);
 
 			fclose($handle);
 
@@ -149,12 +154,59 @@ class Database
 
 
 	/**
+	 *
+	 */
+	public function getEntity(string $class, array $columns, array $data)
+	{
+		if (is_subclass_of($class, Entity::class, TRUE)) {
+			$reflections = $this->getReflections($class);
+			$fields      = array_map(fn($column) => $reflections[$column]->getName(), $columns);
+			$entity      = $this->mapEntity(
+				new $class($this, array_combine($fields, $data), TRUE)
+			);
+
+		} else {
+			$entity = new $class($this, array_combine($columns, $data), TRUE);
+
+		}
+
+		return $entity;
+	}
+
+
+	/**
+	 *
+	 */
+	public function getReflection(string|Entity $class, string $column): ReflectionProperty
+	{
+		if ($class instanceof Entity) {
+			$class = get_class($class);
+		}
+
+		$reflections = $this->getReflections($class);
+
+		if (!isset($reflections[$column])) {
+			throw new RuntimeException(sprintf(
+				'Cannot get property for column "%s" on "%s"',
+				$column,
+				$class
+			));
+		}
+
+		return $reflections[$column];
+	}
+
+	/**
 	 * Get entity property reflections
 	 * @param class-string $class
 	 * @return array<ReflectionProperty>
 	 */
-	public function getReflections(string $class): array
+	public function getReflections(string|Entity $class): array
 	{
+		if ($class instanceof Entity) {
+			$class = get_class($class);
+		}
+
 		if (!isset($this->reflections[$class])) {
 			if (!$class::table) {
 				throw new RuntimeException(sprintf(
@@ -198,6 +250,10 @@ class Database
 			$this->reflections[$class] = $properties;
 		}
 
+		if (!isset($this->entities[$class])) {
+			$this->entities[$class] = array();
+		}
+
 		return $this->reflections[$class];
 	}
 
@@ -209,8 +265,8 @@ class Database
 	 */
 	public function getRepository(string $class): Repository
 	{
-		if (isset($this->cache[$class])) {
-			return $this->cache[$class];
+		if (isset($this->repositories[$class])) {
+			return $this->repositories[$class];
 		}
 
 		if (!is_a($class, Repository::class, TRUE)) {
@@ -220,6 +276,48 @@ class Database
 			));
 		}
 
-		return $this->cache[$class] = new $class($this);
+		return $this->repositories[$class] = new $class($this);
+	}
+
+
+	/**
+	 *
+	 */
+	public function mapEntity(Entity $entity): Entity
+	{
+		$hash = Entity::__hash($entity);
+
+		if ($hash) {
+			if (!isset($this->entities[$entity::class][$hash])) {
+				$this->entities[$entity::class][$hash] = $entity;
+			} else {
+				$entity = $this->entities[$entity::class][$hash];
+			}
+		}
+
+		return $entity;
+	}
+
+	/**
+	 *
+	 */
+	public function remapEntity(Entity $entity, string $old_hash, string $new_hash): Entity
+	{
+		if (!$old_hash) {
+			if ($new_hash) {
+				$this->entities[$entity::class][$new_hash] = $entity;
+			}
+
+		} else {
+			if (isset($this->entities[$entity::class][$old_hash])) {
+				unset($this->entities[$entity::class][$old_hash]);
+			}
+
+			if ($new_hash) {
+				$this->entities[$entity::class][$new_hash] = $entity;
+			}
+		}
+
+		return $entity;
 	}
 }

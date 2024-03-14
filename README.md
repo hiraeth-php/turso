@@ -180,42 +180,26 @@ use Hiraeth\Turso\Types;
 
 class User extends Hiraeth\Turso\Entity
 {
-    /**
-     * Table name which holds this type of entity
-     */
     const table = 'users';
     
-    /**
-     * List of fields NOT columns, which correspond to the entity's primary key
-     */
-    const ident = [
+    const identity = [
         'id'
     ];
 
-    /**
-     * Mapping of fields NOT columns, and the corresponding type converter class
-     */
     const types = [
         'dateOfBirth' => Types\Date::class
     ];
-
-    /**
-     * Fields
-     */
     
-    protected int $id;
+    protected $id;
 
-    public string|null $firstName;
+    public $firstName;
 
-    public string|null $lastName;
+    public $lastName;
 
-    public string $email;
+    public $email;
     
-    public DateTime|null $dateOfBirth;
+    public $dateOfBirth;
 
-    /**
-     * Helper
-     */
     public function fullName()
     {
         return trim(sprintf(
@@ -301,8 +285,6 @@ This means that when you pull an entity from a users repository or cast it as `U
 
 Typed entities have another benefit.  Namely, they can easily obtain related entities of other types.  Let's imagine that in addition to our `User` entity we have an `Occupation` entity, and every user has one occupation, and every occupation has many users.  Additionally, let's imagine that we have a `friends` table which allows users to add each other as friends, creating a many-to-many relationship.  Here we can review each one of these relationships in more detail:
 
->  NOTE: when defining association mappings we are _always_ using the actual **column names**, _NOT_ the corresponding field names found on the entity as properties..
-
 #### Star-to-One
 
 ```php
@@ -330,6 +312,8 @@ We then use that association to retrieve a single record via `hasOne()`.  The fi
     'occupation' => 'id'
 ]
 ```
+
+> NOTE: when defining returned associations we are _always_ using the actual column names, not the corresponding property names found on the entity.
 
 The second argument to the `hasOne()` method tells the association not to _refresh_.  This means that once the related record is obtained, we won't be querying again.  If this were set to `TRUE`, every call to `occupation()` would perform a query to look up the related occupation.  While this is good if you have rapidly changing data, it's also a drain on performance.  We recommend adding an argument to the `occupation()` method itself to pass along in the event you do need to refresh:
 
@@ -463,7 +447,7 @@ class Users extends Hiraeth\Turso\Repository
 }
 ```
 
-> NOTE: The `order` constant which defines the default sort ordering when selecting entities is expressed in _field names_, not columns.
+> NOTE: The `order` constant which defines the default sort ordering when selecting entities as well as the `identity` constant which specified fields that constitute the primary key or unique ID of the entities are expressed in _field names_, not columns.
 
 ### Getting Repositories
 

@@ -220,7 +220,7 @@ abstract class Repository
 
 		$this->handle($entity, __FUNCTION__);
 
-		foreach (static::entity::_diff($entity, TRUE) as $field => $value) {
+		foreach (static::entity::__diff($entity, TRUE) as $field => $value) {
 			if (isset(static::entity::types[$field])) {
 				$type  = static::entity::types[$field];
 				$value = $type::to($value);
@@ -240,8 +240,10 @@ abstract class Repository
 
 			$reflections[$identity]->setValue($entity, $result->getInsertId());
 
-			static::entity::_diff($entity, TRUE);
+			static::entity::__diff($entity, TRUE);
 		}
+
+		$this->database->mapEntity($entity);
 
 		return $result->of(static::entity);
 	}
@@ -285,7 +287,9 @@ abstract class Repository
 		$sets     = array();
 		$ident    = array();
 		$original = array();
-		$values   = static::entity::_diff($entity, TRUE, $original);
+		$old_hash = Entity::__hash($entity);
+		$new_hash = Entity::__hash($entity);
+		$values   = static::entity::__diff($entity, TRUE, $original);
 		$query    = new UpdateQuery($this->database, static::entity::table);
 
 		$this->handle($entity, __FUNCTION__);
@@ -347,6 +351,10 @@ abstract class Repository
 					->var('value', $value)
 				;
 			}
+		}
+
+		if ($old_hash != $new_hash) {
+			$this->database->remapEntity($entity, $old_hash, $new_hash);
 		}
 
 		return $this->database

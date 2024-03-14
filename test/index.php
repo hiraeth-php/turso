@@ -1,5 +1,7 @@
 <?php
 
+use Hiraeth\Turso\Entity;
+
 require(__DIR__ . '/../vendor/autoload.php');
 
 $database = new Hiraeth\Turso\Database(
