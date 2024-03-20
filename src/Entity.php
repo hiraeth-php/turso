@@ -236,7 +236,7 @@ class Entity
 	 */
 	public function __isset(string $name): bool
 	{
-		return property_exists($this, $name);
+		return is_callable([$this, '_' . $name]) || property_exists($this, $name);
 	}
 
 

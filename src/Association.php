@@ -150,7 +150,7 @@ class Association
 	 */
 	public function hasMany(array $map, bool $refresh = FALSE): Result
 	{
-		$cache_key = sprintf('%s@%s[%s]', key($map), $this->target::class, $this->through);
+		$cache_key = sprintf('%s@%s[%s]', key($map), $this->target, $this->through);
 
 		if (!isset($this->cacheResult[$cache_key]) || $refresh) {
 			$this->cacheResult[$cache_key] = $this->getResult($map)
