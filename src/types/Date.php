@@ -13,7 +13,11 @@ class Date {
 	 */
 	static public function from(string|null $date): DateTime|null
 	{
-		return $date ? new DateTime($date) : NULL;
+		if (!$date) {
+			return NULL;
+		}
+
+		return new DateTime($date);
 	}
 
 
@@ -22,6 +26,10 @@ class Date {
 	 */
 	static public function to(DateTime|null $date): string|null
 	{
-		return $date ? $date->format('Y-m-d') : NULL;
+		if (!$date) {
+			return NULL;
+		}
+
+		return $date->format('Y-m-d');
 	}
 }
