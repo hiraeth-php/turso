@@ -77,8 +77,8 @@ abstract class Repository
 	 */
 	public function create(array $values = array()): Entity
 	{
-		$class = static::entity;
-
+		$class   = static::entity;
+		$entity  = new $class($this->database);
 		$invalid = array_diff(
 			array_keys($values),
 			array_keys($this->mapping)
@@ -93,13 +93,10 @@ abstract class Repository
 		}
 
 		foreach ($values as $field => $value) {
-			$values[$field] = [
-				'type'  => gettype($value),
-				'value' => $value
-			];
+			$entity->$field = $value;
 		}
 
-		return new $class($this->database, $values);
+		return $entity;
 	}
 
 
