@@ -25,6 +25,7 @@ $database
 	->execute("
 		CREATE TABLE IF NOT EXISTS users (
 			id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+			parent INTEGER REFERENCES users(id) ON DELETE SET NULL ON UPDATE CASCADE,
 			first_name TEXT,
 			last_name TEXT,
 			email TEXT NOT NULL UNIQUE,
@@ -47,7 +48,7 @@ $users
 			'lastName'  => 'Wick',
 			'email'     => 'babayaga@hotmail.com',
 			'age'       => 44,
-			'died'      => '2023-03-24'
+			'died'      => new DateTime('2023-03-24')
 		])
 	)
 ;
@@ -67,16 +68,21 @@ $users
 // Ensure IDs get assigned
 //
 
-echo $jwick->id . PHP_EOL;
-echo $mouse->id . PHP_EOL;
+echo PHP_EOL;
+echo 'JWick Insert ID: ' . $jwick->id . PHP_EOL;
+echo 'Mouse Insert ID: ' . $mouse->id . PHP_EOL;
 
 //
-// Update Wick's age (should onlys send difference)
+// Update Wick's age (should onlys send difference) and parent
 //
-
-$jwick->age = 45;
+//
+$jwick->age    = 45;
+$jwick->parent = $mouse;
 
 $users->update($jwick)->throw();
+
+echo PHP_EOL;
+echo 'Jwick Parent ID: ' . $jwick->parent->id . PHP_EOL;
 
 //
 // Null Mouse's name
@@ -95,9 +101,9 @@ $users->delete($mouse)->throw();
 // Test findAll(), should only be Wick
 //
 foreach ($users->findAll() as $user) {
-	$user->age = 46;
+	echo PHP_EOL . 'User ID: ' . $user->id . ', Died: ' . $user->died->format('m/d/y') . PHP_EOL;
 
-	echo PHP_EOL . $user->died->format('m/d/y') . PHP_EOL;
+	$user->age = 46;
 
 	$users->update($user)->throw();
 }
@@ -106,7 +112,17 @@ foreach ($users->findAll() as $user) {
 // Update ID
 //
 
-$jwick->id = 0;
+try {
+	$jwick->id = 0;
+
+	throw new Exception('Failed trying to set entity id');
+} catch (RuntimeException $e) {
+
+}
+
+//
+// Should be an empty update
+//
 
 $users->update($jwick)->throw();
 
@@ -117,8 +133,7 @@ $users->update($jwick)->throw();
 $records = $database->execute("SELECT first_name, last_name FROM users")->of(User::class);
 
 foreach ($records as $user) {
-	echo PHP_EOL . get_class($user) . PHP_EOL;
-	echo PHP_EOL . $user->firstName . PHP_EOL;
+	echo PHP_EOL . get_class($user) . ': ' . $user->fullName . PHP_EOL;
 
 	$user->age  = 47;
 	$user->died = NULL;
@@ -134,10 +149,6 @@ foreach ($records as $user) {
 		// We want to test that this exception occured, so we catch it
 		// and continue;
 	}
-
-	$user->id = $jwick->id;  // Now that we've set the ID we should be able to update
-
-	$users->update($user)->throw();
 }
 
 //
@@ -147,7 +158,7 @@ foreach ($records as $user) {
 $records = $database->execute("SELECT first_name, last_name FROM users");
 
 foreach ($records as $record) {
-	echo PHP_EOL . $record->first_name . PHP_EOL;
+	echo PHP_EOL . $record->first_name . ' ' . $record->last_name . PHP_EOL;
 
 	try {
 		$users->insert($record)->throw();
@@ -161,6 +172,8 @@ foreach ($records as $record) {
 //
 // Select with count
 //
-$users->select(function() {}, $total)->throw();
+$result = $users->select(function() {}, $total)->throw();
 
 echo PHP_EOL . $total . PHP_EOL;
+
+echo $result->getRecord(0)->parent->id;

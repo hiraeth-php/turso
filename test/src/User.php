@@ -18,44 +18,23 @@ class User extends Hiraeth\Turso\Entity
 	];
 
 	protected int $id;
-	protected string|null $firstName;
-	protected string|null $lastName;
-	protected string $email;
-	protected int|null $age;
-	protected DateTime|null $died;
+	protected int|null $parent;
+	public string|null $firstName;
+	public string|null $lastName;
+	public string $email;
+	public int|null $age;
+	public DateTime|null $died;
 
-	/**
-	 * Make properties publicly readable.
-	 */
-	public function __get(string $name): mixed
-	{
-		if (array_key_exists($name, $this->_values)) {
-			return $this->$name;
-		}
-
-		throw new RuntimeException(sprintf(
-			'Class "%s" does not allow public access to property named %s',
-			static::class,
-			$name
-		));
+	protected function _fullName() {
+		return trim(sprintf('%s %s', $this->firstName, $this->lastName));
 	}
 
-	/**
-	 * You should not do this, if you want your properties to be publicly writable, just make
-	 * them public.  This is only for testing purposes.
-	 */
-	public function __set(string $name, mixed $value): void
+	protected function _parent(bool|self $refresh = FALSE): self|null
 	{
-		if (array_key_exists($name, $this->_values)) {
-			$this->$name = $value;
-
-			return;
+		if ($refresh instanceof self) {
+			return $this(self::class)->changeOne($refresh, ['id' => 'parent']);
 		}
 
-		throw new RuntimeException(sprintf(
-			'Class "%s" does not allow public access to property named %s',
-			static::class,
-			$name
-		));
+		return $this(self::class)->hasOne(['parent' => 'id'], $refresh);
 	}
 }

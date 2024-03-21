@@ -83,61 +83,26 @@ class Association
 	 */
 	public function changeOne(Entity $entity, array $map)
 	{
-		$ident             = array();
 		$source_column     = reset($map);
 		$target_column     = key($map);
-		$cache_key         = sha1(serialize(array_flip($map)));
-		$query             = new Query($this->database);
 		$source_reflection = $this->database->getReflection($this->source, $source_column);
 		$target_reflection = $this->database->getReflection($this->target, $target_column);
+		$cache_key         = sha1(serialize(array_flip($map)));
 
 		if (in_array($source_column, $this->source::ident)) {
-			$update = $entity;
-			$column = $target_column;
-			$value  = $source_reflection->getValue($this->source);
+			$update_entity = $entity;
+			$update_value  = $source_reflection->getValue($this->source);
 
-			$target_reflection->setValue($update, $value);
+			$target_reflection->setValue($update_entity, $update_value);
 
 		} else {
-			$update = $this->source;
-			$column = $source_column;
-			$value  = $target_reflection->getValue($entity);
+			$update_entity = $this->source;
+			$update_value  = $target_reflection->getValue($entity);
 
-			$source_reflection->setValue($update, $value);
+			$source_reflection->setValue($update_entity, $update_value);
 		}
 
-		foreach ($this->database->getReflections($update::class) as $column => $reflection) {
-			if (!in_array($reflection->getName(), $update::ident)) {
-				continue;
-			}
-
-			if (!$reflection->isInitialized($update)) {
-				continue;
-			}
-
-			$ident[] = $query('@column = {value}')
-				->raw('column', $column)
-				->var('value', $reflection->getValue($update))
-			;
-		}
-
-		if (count($ident) == count($update::ident)) {
-			$this->database->execute(
-				"UPDATE @table SET @column = {value} @ident",
-				[
-					'value' => $value,
-				],
-				[
-					'table'  => $update::table,
-					'column' => $column,
-					'ident'  => $query('WHERE @ident')
-						->bind(' AND ', FALSE)
-						->raw('ident', $ident),
-				]
-			)->throw();
-		}
-
-	//	$this->cacheEntity[$cache_key] = $entity;
+		$this->cacheEntity[$cache_key] = $entity;
 
 		return $this->source;
 	}
@@ -214,8 +179,7 @@ class Association
 					'link'    => $keys[1],
 					'through' => $this->through,
 					'local'   => reset($map),
-				],
-				FALSE
+				]
 			);
 		} else {
 			$result = $this->database->execute(
@@ -226,8 +190,7 @@ class Association
 				[
 					'table'  => $target_table,
 					'column' => reset($map)
-				],
-				FALSE
+				]
 			);
 		}
 

@@ -30,7 +30,7 @@ class Database
 	protected $client;
 
 	/**
-	 * @var array<string, array<string, mixed>
+	 * @var array<string, array<string, mixed>>
 	 */
 	protected $entities = array();
 
@@ -113,7 +113,7 @@ class Database
 	 * @param array<string, mixed> $identifiers
 	 * @return Result<Entity>
 	 */
-	public function execute(string $sql, array $params = array(), array $identifiers = array(), bool $type = TRUE): Result
+	public function execute(string $sql, array $params = array(), array $identifiers = array()): Result
 	{
 		$headers = [ 'Content-Type' => 'application/json' ];
 		$handle  = fopen('php://memory', 'w');
@@ -136,7 +136,7 @@ class Database
 
 			$response = $this->client->sendRequest(new Request('POST', $url, $headers, $stream));
 			$content  = json_decode($response->getBody()->getContents(), TRUE);
-			$result   = new Result($query, $this, $content, $type);
+			$result   = new Result($query, $this, $content);
 
 			fclose($handle);
 
@@ -154,19 +154,23 @@ class Database
 
 
 	/**
-	 *
+	 * @template T of Entity
+	 * @param class-string<T> $class
+	 * @param array<string> $columns
+	 * @param array<mixed> $data
+	 * @return T
 	 */
-	public function getEntity(string $class, array $columns, array $data)
+	public function getEntity(string $class, array $columns, array $data): Entity
 	{
 		if (is_subclass_of($class, Entity::class, TRUE)) {
 			$reflections = $this->getReflections($class);
 			$fields      = array_map(fn($column) => $reflections[$column]->getName(), $columns);
-			$entity      = $this->mapEntity(
-				new $class($this, array_combine($fields, $data), TRUE)
-			);
+			$entity      = $class::__init($this, array_combine($fields, $data), TRUE);
+
+			$this->mapEntity($entity);
 
 		} else {
-			$entity = new $class($this, array_combine($columns, $data), TRUE);
+			$entity = $class::__init($this, array_combine($columns, $data), TRUE);
 
 		}
 
@@ -175,7 +179,8 @@ class Database
 
 
 	/**
-	 *
+	 * @template T of Entity
+	 * @param class-string<T>|T $class
 	 */
 	public function getReflection(string|Entity $class, string $column): ReflectionProperty
 	{
@@ -198,7 +203,8 @@ class Database
 
 	/**
 	 * Get entity property reflections
-	 * @param class-string $class
+	 * @template T of Entity
+	 * @param class-string<T>|T $class
 	 * @return array<ReflectionProperty>
 	 */
 	public function getReflections(string|Entity $class): array
@@ -259,9 +265,10 @@ class Database
 
 
 	/**
-	 * Get a repository by its class name
-	 * @param class-string $class
-	 * @return Repository
+	 * Get a repository: by its class name
+	 * @template T of Repository
+	 * @param class-string<T> $class
+	 * @return T
 	 */
 	public function getRepository(string $class): Repository
 	{
@@ -283,9 +290,9 @@ class Database
 	/**
 	 *
 	 */
-	public function mapEntity(Entity $entity): Entity
+	public function mapEntity(Entity &$entity): void
 	{
-		$hash = Entity::__hash($entity);
+		$hash = $entity::__hash($entity);
 
 		if ($hash) {
 			if (!isset($this->entities[$entity::class][$hash])) {
@@ -294,30 +301,42 @@ class Database
 				$entity = $this->entities[$entity::class][$hash];
 			}
 		}
-
-		return $entity;
 	}
 
 	/**
 	 *
 	 */
-	public function remapEntity(Entity $entity, string $old_hash, string $new_hash): Entity
+	public function remapEntity(Entity $entity, string $old_hash): void
 	{
-		if (!$old_hash) {
-			if ($new_hash) {
-				$this->entities[$entity::class][$new_hash] = $entity;
-			}
+		$hash = $entity::__hash($entity);
 
-		} else {
-			if (isset($this->entities[$entity::class][$old_hash])) {
-				unset($this->entities[$entity::class][$old_hash]);
-			}
+		if ($old_hash != $hash) {
+			if (!$old_hash) {
+				if ($hash) {
+					$this->entities[$entity::class][$hash] = $entity;
+				}
 
-			if ($new_hash) {
-				$this->entities[$entity::class][$new_hash] = $entity;
+			} else {
+				if (isset($this->entities[$entity::class][$old_hash])) {
+					unset($this->entities[$entity::class][$old_hash]);
+				}
+
+				if ($hash) {
+					$this->entities[$entity::class][$hash] = $entity;
+				}
 			}
 		}
+	}
 
-		return $entity;
+	/**
+	 *
+	 */
+	public function unmapEntity(Entity $entity): void
+	{
+		$hash = $entity::__hash($entity);
+
+		if ($hash) {
+			unset($this->entities[$entity::class][$hash]);
+		}
 	}
 }

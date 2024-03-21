@@ -78,7 +78,6 @@ abstract class Repository
 	public function create(array $values = array()): Entity
 	{
 		$class   = static::entity;
-		$entity  = new $class($this->database);
 		$invalid = array_diff(
 			array_keys($values),
 			array_keys($this->mapping)
@@ -91,6 +90,8 @@ abstract class Repository
 				$class
 			));
 		}
+
+		$entity = $class::__init($this->database);
 
 		foreach ($values as $field => $value) {
 			$entity->$field = $value;
@@ -107,21 +108,36 @@ abstract class Repository
 	 */
 	public function delete(Entity $entity): Result
 	{
-		$query = new DeleteQuery($this->database, static::entity::table);
-		$ident = array();
+		$values = static::entity::__dump($entity);
+		$query  = new DeleteQuery($this->database, static::entity::table);
+		$ident  = array();
 
 		$this->handle($entity, __FUNCTION__);
 
 		foreach (static::entity::ident as $field) {
+			if (!array_key_exists($field, $values)) {
+				continue;
+			}
+
 			$column  = $this->mapping[$field];
-			$ident[] = $query->expression()->eq($column, $entity->$field);
+			$ident[] = $query->expression()->eq($column, $values[$field]);
 		}
 
-		return $this->database
-			->execute($query->where(...$ident), [], [], FALSE)
+		if (count($ident) != count(static::entity::ident)) {
+			throw new InvalidArgumentException(sprintf(
+				'Cannot delete entity "%s", insufficient identy fields',
+				static::entity
+			));
+		}
+
+		$result = $this->database
+			->execute($query->where(...$ident))
 			->throw('Failed deleting entity')
-			->of(static::entity)
 		;
+
+		$this->database->unmapEntity($entity);
+
+		return $result->of(static::entity);
 	}
 
 
@@ -207,7 +223,6 @@ abstract class Repository
 
 	/**
 	 * Insert an entity into the database
-	 * @param Entity<T> $entity
 	 * @return Result<T>
 	 */
 	public function insert(Entity $entity): Result
@@ -227,7 +242,7 @@ abstract class Repository
 		}
 
 		$result = $this->database
-			->execute($query->values($values), [], [], FALSE)
+			->execute($query->values($values))
 			->throw('Failed inserting entity')
 		;
 
@@ -257,17 +272,20 @@ abstract class Repository
 		$builder($query->fetch('*'), $query->expression());
 
 		$result = $this->database
-			->execute($query->map($this->mapping), [], [], FALSE)
+			->execute($query->map($this->mapping))
 			->throw('Failed selecting entities')
 			->of(static::entity)
 		;
 
 		if (func_num_args() == 2) {
-			$result = $this->database->execute(
-				$query->fetch('COUNT(*) as total')->limit(NULL)->offset(NULL)
-			);
+			$count = $this->database
+				->execute($query->fetch('COUNT(*) as total')->limit(NULL)->offset(NULL))
+				->throw('Failed counting entities')
+			;
 
-			$total = $result->getRecord(0)->total;
+			if (isset($count->getRecord(0)->total)) {
+				$total = $count->getRecord(0)->total;
+			}
 		}
 
 		return $result;
@@ -276,23 +294,21 @@ abstract class Repository
 
 	/**
 	 * Update an entity in the database
-	 * @param Entity<T> $entity
 	 * @return Result<T>
 	 */
 	public function update(Entity $entity): Result
 	{
 		$sets     = array();
 		$ident    = array();
-		$original = array();
-		$old_hash = Entity::__hash($entity);
-		$new_hash = Entity::__hash($entity);
-		$values   = static::entity::__diff($entity, TRUE, $original);
+		$original = static::entity::__dump($entity);
+		$old_hash = static::entity::__hash($entity);
+		$values   = static::entity::__diff($entity, TRUE);
 		$query    = new UpdateQuery($this->database, static::entity::table);
 
 		$this->handle($entity, __FUNCTION__);
 
 		if (!$values) {
-			return new Result('NULL', $this->database, [], static::entity);
+			return (new Result(sprintf('NULL'), $this->database))->of(static::entity);
 		}
 
 		foreach (static::entity::ident as $field) {
@@ -303,7 +319,7 @@ abstract class Repository
 				continue;
 			}
 
-			if ($original[$field] instanceof Undefined) {
+			if (!array_key_exists($field, $original)) {
 				$value = $reflection->getValue($entity);
 				unset($values[$field]);
 			} else {
@@ -350,27 +366,27 @@ abstract class Repository
 			}
 		}
 
-		if ($old_hash != $new_hash) {
-			$this->database->remapEntity($entity, $old_hash, $new_hash);
-		}
-
-		return $this->database
-			->execute($query->set(...$sets)->where(...$ident), [], [], FALSE)
+		$result = $this->database
+			->execute($query->set(...$sets)->where(...$ident))
 			->throw('Failed updating entity')
-			->of(static::entity)
 		;
+
+		$this->database->remapEntity($entity, $old_hash);
+
+		return $result->of(static::entity);
 	}
 
 	/**
-	 *
+	 * A simple call to ensure we can handle an entity (used by other methods)
 	 */
 	protected function handle(Entity $entity, string $function): void
 	{
 		if ($entity::class != static::entity) {
 			throw new InvalidArgumentException(sprintf(
-				'Entity of type "%s" cannot be handled by "%s"',
+				'Entity of type "%s" cannot be handled by "%s::%s"',
 				$entity::class,
-				static::class
+				static::class,
+				$function
 			));
 		}
 	}

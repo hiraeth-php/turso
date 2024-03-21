@@ -15,7 +15,7 @@ class Result implements Countable, Iterator
 {
 	/**
 	 * Cache of entity objects, will be erased if entity is re-cast using as()
-	 * @var array<T>
+	 * @var array<T|Entity>
 	 */
 	protected $cache = array();
 
@@ -39,7 +39,7 @@ class Result implements Countable, Iterator
 
 	/**
 	 * The entity class to which results should be mapped
-	 * @var class-string<T>|class-string
+	 * @var class-string<T|Entity>
 	 */
 	protected $entity;
 
@@ -59,17 +59,12 @@ class Result implements Countable, Iterator
 	/**
 	 * Create a new Result instance
 	 * @param array<mixed> $content
-	 * @param bool|class-string<T> $class
 	 */
-	public function __construct(string $sql, Database $database, array $content, bool|string $class = Entity::class)
+	public function __construct(string $sql, Database $database, array $content = array())
 	{
 		$this->sql      = $sql;
 		$this->database = $database;
 		$this->content  = $content;
-
-		if ($class == Entity::class) {
-			$this->entity = Entity::class;
-		}
 	}
 
 
@@ -91,7 +86,7 @@ class Result implements Countable, Iterator
 
 	/**
 	 * {@inheritDoc}
-	 * @return T|null
+	 * @return T|Entity|null
 	 */
 	public function current(): ?Entity
 	{
@@ -162,7 +157,7 @@ class Result implements Countable, Iterator
 
 	/**
 	 * Get a record at a given position/index
-	 * @return T|null
+	 * @return T|Entity|null
 	 */
 	public function getRecord(int $index): ?Entity
 	{
@@ -172,7 +167,7 @@ class Result implements Countable, Iterator
 		if ($data) {
 			if (!isset($this->cache[$index])) {
 				$this->cache[$index] = $this->database->getEntity(
-					$this->entity,
+					$this->entity ?: Entity::class,
 					$this->getColumns(),
 					$data
 				);
@@ -187,7 +182,7 @@ class Result implements Countable, Iterator
 
 	/**
 	 * Get all the records as an array
-	 * @return array<T>
+	 * @return array<T|Entity>
 	 */
 	public function getRecords(): array
 	{
@@ -255,7 +250,7 @@ class Result implements Countable, Iterator
 	 * Cast the result as a typed DTO
 	 * @template C of Entity
 	 * @param class-string<C> $class
-	 * @return Result<C>
+	 * @return self<C>
 	 */
 	public function of(string $class): self
 	{
