@@ -32,7 +32,7 @@ class Entity
 
 	/**
 	 * The value store for untyped DTOs
-     * @var array<string, mixed>
+	 * @var array<string, mixed>
 	 */
 	protected $_values = array();
 
@@ -83,7 +83,7 @@ class Entity
 
 
 	/**
-	*
+	 *
 	 * @param static $entity
 	 * @return array<string, mixed>
 	 */
