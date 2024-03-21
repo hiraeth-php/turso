@@ -303,30 +303,6 @@ class Database
 		}
 	}
 
-	/**
-	 *
-	 */
-	public function remapEntity(Entity $entity, string $old_hash): void
-	{
-		$hash = $entity::__hash($entity);
-
-		if ($old_hash != $hash) {
-			if (!$old_hash) {
-				if ($hash) {
-					$this->entities[$entity::class][$hash] = $entity;
-				}
-
-			} else {
-				if (isset($this->entities[$entity::class][$old_hash])) {
-					unset($this->entities[$entity::class][$old_hash]);
-				}
-
-				if ($hash) {
-					$this->entities[$entity::class][$hash] = $entity;
-				}
-			}
-		}
-	}
 
 	/**
 	 *

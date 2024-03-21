@@ -108,30 +108,25 @@ abstract class Repository
 	 */
 	public function delete(Entity $entity): Result
 	{
-		$values = static::entity::__dump($entity);
-		$query  = new DeleteQuery($this->database, static::entity::table);
-		$ident  = array();
-
 		$this->handle($entity, __FUNCTION__);
 
+		$ident  = array();
+		$values = static::entity::__dump($entity);
+		$query  = new DeleteQuery($this->database, static::entity::table);
+
 		foreach (static::entity::ident as $field) {
-			if (!array_key_exists($field, $values)) {
-				continue;
+			if (array_key_exists($field, $values)) {
+				$ident[$field] = $query->expression()->eq($field, $values[$field]);
+			} else {
+				throw new InvalidArgumentException(sprintf(
+					'Cannot delete entity of type "%s", insufficient identity',
+					static::entity
+				));
 			}
-
-			$column  = $this->mapping[$field];
-			$ident[] = $query->expression()->eq($column, $values[$field]);
-		}
-
-		if (count($ident) != count(static::entity::ident)) {
-			throw new InvalidArgumentException(sprintf(
-				'Cannot delete entity "%s", insufficient identy fields',
-				static::entity
-			));
 		}
 
 		$result = $this->database
-			->execute($query->where(...$ident))
+			->execute($query->where(...$ident)->map($this->mapping))
 			->throw('Failed deleting entity')
 		;
 
@@ -227,17 +222,12 @@ abstract class Repository
 	 */
 	public function insert(Entity $entity): Result
 	{
-		$query  = new InsertQuery($this->database, static::entity::table);
-		$values = array();
-
 		$this->handle($entity, __FUNCTION__);
 
-		foreach (static::entity::__diff($entity, TRUE) as $field => $value) {
-			if (isset(static::entity::types[$field])) {
-				$type  = static::entity::types[$field];
-				$value = $type::to($value);
-			}
+		$values = array();
+		$query  = new InsertQuery($this->database, static::entity::table);
 
+		foreach (static::entity::__diff($entity, TRUE) as $field => $value) {
 			$values[$this->mapping[$field]] = $value;
 		}
 
@@ -298,80 +288,46 @@ abstract class Repository
 	 */
 	public function update(Entity $entity): Result
 	{
+		$this->handle($entity, __FUNCTION__);
+
 		$sets     = array();
 		$ident    = array();
 		$original = static::entity::__dump($entity);
-		$old_hash = static::entity::__hash($entity);
-		$values   = static::entity::__diff($entity, TRUE);
+		$values   = static::entity::__diff($entity);
 		$query    = new UpdateQuery($this->database, static::entity::table);
-
-		$this->handle($entity, __FUNCTION__);
 
 		if (!$values) {
 			return (new Result(sprintf('NULL'), $this->database))->of(static::entity);
 		}
 
 		foreach (static::entity::ident as $field) {
-			$column     = $this->mapping[$field];
-			$reflection = $this->database->getReflections(static::entity)[$column];
-
-			if (!$reflection->isInitialized($entity)) {
-				continue;
-			}
-
-			if (!array_key_exists($field, $original)) {
-				$value = $reflection->getValue($entity);
-				unset($values[$field]);
+			if (array_key_exists($field, $original)) {
+				$ident[$field] = $query->expression()->eq($field, $original[$field]);
+			} elseif (array_key_exists($field, $values)) {
+				$ident[$field] = $query->expression()->eq($field, $values[$field]);
 			} else {
-				$value = $original[$field];
+				throw new InvalidArgumentException(sprintf(
+					'Cannot update entity of type "%s", insufficient identify',
+					static::entity
+				));
 			}
-
-			if (isset(static::entity::types[$field])) {
-				$type  = static::entity::types[$field];
-				$value = $type::to($value);
-			}
-
-			$ident[$field] = $query->expression()->eq($column, $value);
-		}
-
-		if (array_diff(static::entity::ident, array_keys($ident))) {
-			$reflection = new ReflectionClass(static::entity);
-
-			$reflection->getProperty('_values')->setValue($entity, $original);
-
-			throw new InvalidArgumentException(sprintf(
-				'Cannot update entity of type "%s", insufficient identify',
-				static::entity
-			));
 		}
 
 		foreach ($values as $field => $value) {
-			$column     = $this->mapping[$field];
-			$reflection = $this->database->getReflections(static::entity)[$column];
-
-			if (!$reflection->isInitialized($entity)) {
-				continue;
-			}
-
-			if (array_key_exists($field, $values)) {
-				if (isset(static::entity::types[$field])) {
-					$type = static::entity::types[$field];
-					$value = $type::to($value);
-				}
-
-				$sets[] = $query('@column = {value}')
-					->raw('column', $column, TRUE)
-					->var('value', $value)
-				;
-			}
+			$sets[] = $query('@column = {value}')
+				->raw('column', $field, TRUE)
+				->var('value', $value)
+			;
 		}
 
 		$result = $this->database
-			->execute($query->set(...$sets)->where(...$ident))
+			->execute($query->set(...$sets)->where(...$ident)->map($this->mapping))
 			->throw('Failed updating entity')
 		;
 
-		$this->database->remapEntity($entity, $old_hash);
+		$this->database->unmapEntity($entity);
+		static::entity::__diff($entity, TRUE);
+		$this->database->mapEntity($entity);
 
 		return $result->of(static::entity);
 	}

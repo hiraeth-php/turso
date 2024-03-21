@@ -165,7 +165,7 @@ class Query
 	 * Map any values signified as names to new names (usually just columns)
 	 * @param array<string, string> $mapping
 	 */
-	public function map(array $mapping): self
+	public function map(array $mapping): static
 	{
 		$map = function($name) use ($mapping) {
 			if (!isset($mapping[$name])) {

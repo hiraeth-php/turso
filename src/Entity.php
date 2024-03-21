@@ -60,17 +60,21 @@ class Entity
 			return $entity->_values;
 		}
 
-		$values = array();
+		$new_values = array();
+		$old_values = static::__dump($entity);
 
 		foreach ($entity->_database->getReflections(static::class) as $reflection) {
-			$field = $reflection->getName();
-
 			if (!$reflection->isInitialized($entity)) {
 				continue;
 			}
 
-			if (!array_key_exists($field, $entity->_values) || $entity->$field != $entity->_values[$field]) {
-				$values[$field] = $entity->$field;
+			$field     = $reflection->getName();
+			$new_value = isset(static::types[$field])
+				? static::types[$field]::to($entity->$field)
+				: $entity->$field;
+
+			if (!array_key_exists($field, $old_values) || $new_value != $old_values[$field]) {
+				$new_values[$field] = $new_value;
 
 				if ($reset) {
 					$entity->_values[$field] = $entity->$field;
@@ -78,18 +82,43 @@ class Entity
 			}
 		}
 
-		return $values;
+		return $new_values;
 	}
 
 
 	/**
-	 *
+	 * Dump an entities values for database transactions
 	 * @param static $entity
+	 * @param array<string> $fields
 	 * @return array<string, mixed>
 	 */
-	static final public function __dump(Entity $entity): array
+	static final public function __dump(Entity $entity, array $fields = array()): array
 	{
-		return $entity->_values;
+		if (static::class == self::class) {
+			return count($fields)
+				? array_intersect_key($entity->_values, array_flip($fields))
+				: $entity->_values;
+		}
+
+		$values = array();
+
+		foreach ($entity->_database->getReflections(static::class) as $reflection) {
+			$field = $reflection->getName();
+
+			if (count($fields) && !in_array($field, $fields)) {
+				continue;
+			}
+
+			if (!array_key_exists($field, $entity->_values)) {
+				continue;
+			}
+
+			$values[$field] = isset(static::types[$field])
+				? static::types[$field]::to($entity->_values[$field])
+				: $entity->_values[$field];
+		}
+
+		return $values;
 	}
 
 
@@ -99,18 +128,7 @@ class Entity
 	 */
 	final static public function __hash(Entity $entity): string|null
 	{
-		$values = array_intersect_key($entity->_values, array_flip($entity::ident));
-
-		foreach ($values as $field => $value) {
-			if (!array_key_exists($field, $values)) {
-				unset($value[$field]);
-				continue;
-			}
-
-			if (isset($entity::types[$field])) {
-				$values[$field] = $entity::types[$field]::to($value);
-			}
-		}
+		$values = static::__dump($entity, static::ident);
 
 		if (count($values) == count($entity::ident)) {
 			return sha1(serialize($values));
@@ -121,7 +139,7 @@ class Entity
 
 
 	/**
-	 * Do not allow for constructor overload
+	 * Initialize a new entity with data
 	 * @param array<string, array<string, string>> $values
 	 */
 	final static public function __init(Database $database, array $values = array(), bool $existing = FALSE): static
@@ -173,17 +191,17 @@ class Entity
 					));
 			}
 
-			if (isset($entity::types[$field])) {
-				$type  = $entity::types[$field];
-				$value = $type::from($value);
+			if (static::class != self::class) {
+				if (isset(static::types[$field])) {
+					$type  = static::types[$field];
+					$value = $type::from($value);
+				}
+
+				$entity->$field = $value;
 			}
 
 			if ($existing) {
 				$entity->_values[$field] = $value;
-			}
-
-			if (static::class != self::class) {
-				$entity->$field = $value;
 			}
 		}
 
